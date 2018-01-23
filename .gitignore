@@ -1,4 +1,4 @@
 /myProject/.idea
-/myProject/out/production
+/myProject/out/production/*
 /myProject/core/*.iml
 /myProject/base/*.iml
