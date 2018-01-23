@@ -7,7 +7,6 @@ import org.apache.spark.mllib.clustering.KMeans
 import org.apache.spark.mllib.feature.Normalizer
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
-
 import scala.collection.mutable.ArrayBuffer
 
 
