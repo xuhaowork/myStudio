@@ -4,7 +4,6 @@ import breeze.linalg
 import breeze.linalg.{DenseVector, diag}
 import com.self.core.baseApp.myAPP
 import org.apache.spark.mllib.linalg.DenseMatrix
-
 import scala.collection.mutable.ArrayBuffer
 
 /**
