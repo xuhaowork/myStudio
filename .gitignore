@@ -1,0 +1,3 @@
+*.iml
+/myProject/.idea/libraries/*.xml
+/myProject/.idea/*.xml
