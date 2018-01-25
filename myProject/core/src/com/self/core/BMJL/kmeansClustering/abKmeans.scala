@@ -114,7 +114,8 @@ object abKmeans extends myAPP{
 
     val u = mutable.HashMap("" -> 1, "1" -> 2, -1L -> 3).remove("-1").getOrElse(mutable.HashMap("" -> 1, "1" -> 2, -1L -> 3))
 
-
+Array
+    Double.PositiveInfinity
 
 
 
