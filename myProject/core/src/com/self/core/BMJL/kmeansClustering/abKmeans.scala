@@ -7,6 +7,8 @@ import org.apache.spark.mllib.clustering.KMeans
 import org.apache.spark.mllib.feature.Normalizer
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
+
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 
@@ -107,6 +109,14 @@ object abKmeans extends myAPP{
 //
 //    val sumAllView = a.view.zip(100000 until 200000).flatMap(x => Array.tabulate(x._1)(i => x._2)).sum
 //    println(sumAllView)
+
+    println(math.log(math.exp(1.2)))
+
+    val u = mutable.HashMap("" -> 1, "1" -> 2, -1L -> 3).remove("-1").getOrElse(mutable.HashMap("" -> 1, "1" -> 2, -1L -> 3))
+
+
+
+
 
   }
 }

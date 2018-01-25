@@ -2,7 +2,7 @@ package com.self.core.testBaseApp
 
 
 import com.self.core.baseApp.myAPP
-import com.self.core.syntax.learningPrivate
+//import com.self.core.syntax.learningPrivate
 import scala.collection.mutable.ArrayBuffer
 
 
