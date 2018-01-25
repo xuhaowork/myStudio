@@ -92,17 +92,34 @@ object learningObject extends myAPP with Serializable {
 //        newRdd.foreach(println)
 
 
+    object Transposer{
+      implicit class TransArr[T](val matrix: Array[Array[T]]){
+        def transposeee(): Seq[Seq[T]] =
+        {
+          Array.range(0, matrix.head.length).map(i => matrix.view.map(_(i)))
+        }
+      }
+
+      implicit class TransSeq[T](val matrix: Seq[Seq[T]]){
+        def transposeee(): Seq[Seq[T]] =
+        {
+          Array.range(0, matrix.head.length).map(i => matrix.view.map(_(i)))
+        }
+      }
+    }
+
+    val matrix = Seq(Seq(0, 1, 0), Seq(0, 0, 1), Seq(1, 0, 0))
+    matrix.foreach(arr => println(arr.mkString(", ")))
+
+    // 转置
+    import Transposer._
+    matrix.transposeee().foreach(arr => println(arr.mkString(", ")))
 
 
 
-
-
-//      }
-
-
-//    }
-
-
+    Array.range(0, 10).foreach(println)
+    val s = Array.range(0, 10)
+    s.slice(0, s.length).foreach(println)
   }
 
 }
