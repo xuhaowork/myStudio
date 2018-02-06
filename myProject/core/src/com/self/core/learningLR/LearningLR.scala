@@ -16,7 +16,16 @@ object LearningLR extends myAPP{
 */
 
 
+    println(3.0/2 - 5.0/2 * 5.0/2)
 
+
+    println(1.5 - 6.25)
+
+    println("""fff"""
+      + """fff""")
+
+
+    println(24*3600)
 
 
 
