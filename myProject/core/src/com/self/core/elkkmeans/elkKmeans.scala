@@ -48,7 +48,7 @@ object elkKmeans extends myAPP{
     println(8000/(1/0.11 - 1))
 
     import org.apache.spark.sql.functions.udf
-
+    import org.apache.spark.mllib.clustering.KMeans
 
 
 

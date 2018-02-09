@@ -1,4 +1,4 @@
-package org.apache.spark.clustering.mllib
+package org.apache.spark.mllib.clustering
 
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
