@@ -1,16 +1,18 @@
 package org.apache.spark.mllib.feature
 
+import breeze.linalg
 import org.apache.spark.ml.feature.StandardScaler
 import org.apache.spark.mllib.feature.VectorTransformer
 import org.apache.spark.mllib.linalg.{DenseMatrix, EigenValueDecomposition, SparseMatrix, Vector, Vectors}
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
 import org.apache.spark.mllib.linalg.Matrix
 import org.apache.spark.sql.DataFrame
-import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV}
+import breeze.linalg.{diag, eig, DenseMatrix => BDM, DenseVector => BDV, svd => brzSvd}
 import breeze.optimize.MaxIterations
 import org.apache.spark.mllib.feature.PCA
 import org.apache.spark.rdd.RDD
 
+import scala.math
 import scala.collection.mutable
 
 
@@ -96,7 +98,7 @@ class fastICA(private var componetNums: Int, private var runs: Int,
 
 
   private def checkNums(colNums: Long, rowNums: Long): Boolean =
-    componetNums <= math.min(colNums, rowNums)
+    componetNums <= scala.math.min(colNums, rowNums)
 
   /** Transform the matrix to a matrix with zero means. Used in whiteMatrix. */
   private def standardWithMean(matrix: RowMatrix)
@@ -142,12 +144,21 @@ class fastICA(private var componetNums: Int, private var runs: Int,
       "should try PCA in the white stage.")
 
     val sqrtEigen = svdMatrix.s.toBreeze
-      .map(eigen => 1 / math.sqrt(eigen))
+      .map(eigen => 1 / scala.math.sqrt(eigen))
 
     val sqrtEigenMatrix = DenseMatrix.diag(Vectors.fromBreeze(sqrtEigen))
 
     svdMatrix.U.multiply(sqrtEigenMatrix).multiply(svdMatrix.V.transpose)
   }
+
+
+  private def orthogonalize(matrix: BDM[Double])
+  : (BDV[Double], BDM[Double]) = {
+    val eigObj = eig.apply(matrix)
+    (eigObj.eigenvalues, eigObj.eigenvectors)
+  }
+
+
 
 
   /** Transform the matrix to a white matrix. */
@@ -192,7 +203,18 @@ class fastICA(private var componetNums: Int, private var runs: Int,
     new DenseMatrix(pColNums, componetNums, weightArr)
   }
 
-  private def projectionPursuit(matrix: RDD[Vector], initialWeight: Matrix) = {
+
+
+  private def subtract(x1: DenseMatrix, x2: DenseMatrix): DenseMatrix = {
+    new DenseMatrix(x1.numCols, x1.numRows, x1.values.zip(x2.values).map{
+      case (d1, d2) => d1 - d2
+    })
+  }
+
+
+  private def projectionPursuit(matrix: RDD[Vector],
+                                initialWeight: Matrix,
+                                pColNums: Int, rowNums: Int) = {
     var W_old = initialWeight.copy
     var W = initialWeight.copy
     val x = new RowMatrix(matrix)
@@ -203,21 +225,32 @@ class fastICA(private var componetNums: Int, private var runs: Int,
       Vectors.dense(x.toArray.flatMap(d => gwx.map(_*d)))
     }).sample(false, fraction, seed)
 
-    val E_Gx = new RowMatrix(wGwX).computeColumnSummaryStatistics().mean
+    val E_Gx_Arr = new RowMatrix(wGwX).computeColumnSummaryStatistics()
+      .mean.toArray
+
+    val E_Gx = new DenseMatrix(componetNums, pColNums, E_Gx_Arr)
+
+    val E_Gdx = xw.rows.map(v => {
+      val u = v.toArray.map(d =>
+      1 - math.tanh(d)*math.tanh(d))
+      Vectors.dense(u)
+    }).sample(false, fraction, seed)
+
+    val gdx_arr: BDV[Double] = new RowMatrix(E_Gdx)
+      .computeColumnSummaryStatistics().mean.toBreeze.toDenseVector
+    val diag_gdx = new DenseMatrix(componetNums, pColNums, diag(gdx_arr).data)
 
 
+    val s1 = W.multiply(diag_gdx)
+    val s2 = E_Gx
 
+    val s = subtract(E_Gx, s1).toBreeze.asInstanceOf[BDM[Double]]
+    orthogonalize(s)._2.toDenseMatrix
+    W = new DenseMatrix(orthogonalize(s)._2.cols, orthogonalize(s)._2.rows, orthogonalize(s)._2.data)
 
-
-
-
-
-
-
-
-
-
-
+    // 当W方向收敛时认为收敛
+    W_old.
+    val distance = W.multiply()
 
   }
 
