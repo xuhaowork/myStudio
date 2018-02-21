@@ -1,13 +1,12 @@
 package org.apache.spark.mllib.feature
 
 import breeze.linalg
-import org.apache.spark.ml.feature.StandardScaler
+import org.apache.spark.ml.feature.{PCAModel, StandardScaler}
 import org.apache.spark.mllib.feature.VectorTransformer
-import org.apache.spark.mllib.linalg.{DenseMatrix, EigenValueDecomposition, SparseMatrix, Vector, Vectors}
+import org.apache.spark.mllib.linalg.{DenseMatrix, DenseVector, EigenValueDecomposition, Matrix, SparseMatrix, Vector, Vectors}
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
-import org.apache.spark.mllib.linalg.Matrix
 import org.apache.spark.sql.DataFrame
-import breeze.linalg.{diag, eig, DenseMatrix => BDM, DenseVector => BDV, svd => brzSvd}
+import breeze.linalg.{diag, eig, eigSym, DenseMatrix => BDM, DenseVector => BDV, svd => brzSvd}
 import breeze.optimize.MaxIterations
 import org.apache.spark.mllib.feature.PCA
 import org.apache.spark.rdd.RDD
@@ -51,7 +50,6 @@ import scala.collection.mutable
   *   w := E{xg(w'*x)} - E{g'(w'*x)}*w;
   *   w = w / ||w||.
   */
---------------------------------------------------------------------------------
 class fastICA(private var componetNums: Int, private var runs: Int,
               private var methods: String, private var whiteMatrixByPCA:
               (Boolean, Int)){
@@ -60,20 +58,15 @@ class fastICA(private var componetNums: Int, private var runs: Int,
   val fraction = 0.8
   val seed = 123L
 
+
+
+
   /** The independent component numbers. */
   def setComponetNums(componetNums: Int): this.type = {
     this.componetNums = componetNums
     this
   }
 
-  /**
-    * The runs in each time, we choose a better one from the runs to avoid the
-    * issues of initialization.
-    */
-  def setRuns(runs: Int): this.type = {
-    this.runs = runs
-    this
-  }
 
   def setMethods(methods: String): this.type = {
     this.methods = methods
@@ -85,12 +78,12 @@ class fastICA(private var componetNums: Int, private var runs: Int,
     this
   }
 
-  private def getSuperNums(colNums: Int): Int = {
+  private def getICANums(colNums: Int): Int = {
     if(this.whiteMatrixByPCA._1){
       val PCANums = this.whiteMatrixByPCA._2
       require(colNums >= PCANums && PCANums >= this.componetNums,
         "The numbers of columns and PCA components should not be less than " +
-          "componentNums.")
+          "component numbers.")
       PCANums
     } else
       this.componetNums
@@ -116,144 +109,126 @@ class fastICA(private var componetNums: Int, private var runs: Int,
   }
 
 
-  /** Transform the matrix with PCA. Used in whiteMatrix. */
-  def computePrincipalModel(matrix: RowMatrix, k: Int): PCAModel = {
-    val pc = matrix.computePrincipalComponents(k) match {
-      case dm: DenseMatrix =>
-        dm
-      case sm: SparseMatrix =>
-        // In the step of transform a matix to a principal matrix, the
-        // sparse vector should be transformed to a dense vector.
-//------------------------------------------------------------------------------
-        sm.toDense
-      case m =>
-        throw new IllegalArgumentException("Unsupported matrix format. " +
-          s"Expected SparseMatrix or DenseMatrix. Instead got: ${m.getClass}")
-    }
-    new PCAModel(k, pc)
-  }
+//  private def orthogonalize(matrix: RowMatrix, colNums: Long, rowNums: Long)
+//  : RowMatrix = {
+//    val svdMatrix = matrix.computeSVD(colNums.toInt)
+//    val checkZero = svdMatrix.s.toBreeze.min
+//    require(checkZero > 0, "The rank of the matrix is less than the " +
+//      "component nums you want, if you want the result of the data you " +
+//      "should try PCA in the white stage.")
+//
+//    val sqrtEigen = svdMatrix.s.toBreeze
+//      .map(eigen => 1 / scala.math.sqrt(eigen))
+//
+//    val sqrtEigenMatrix = DenseMatrix.diag(Vectors.fromBreeze(sqrtEigen))
+//
+//    svdMatrix.U.multiply(sqrtEigenMatrix).multiply(svdMatrix.V.transpose)
+//  }
+//
+//
+//  // 实称阵特征值分解
+//  private def orthogonalize(matrix: BDM[Double])
+//  : (BDV[Double], BDM[Double]) = {
+//    val eigObj = eigSym.apply(matrix)
+//    (eigObj.eigenvalues, eigObj.eigenvectors)
+//  }
 
-
-
-  private def orthogonalize(matrix: RowMatrix, colNums: Long, rowNums: Long)
-  : RowMatrix = {
-    val svdMatrix = matrix.computeSVD(colNums.toInt)
-    val checkZero = svdMatrix.s.toBreeze.min
-    require(checkZero > 0, "The rank of the matrix is less than the " +
-      "component nums you want, if you want the result of the data you " +
-      "should try PCA in the white stage.")
-
-    val sqrtEigen = svdMatrix.s.toBreeze
-      .map(eigen => 1 / scala.math.sqrt(eigen))
-
-    val sqrtEigenMatrix = DenseMatrix.diag(Vectors.fromBreeze(sqrtEigen))
-
-    svdMatrix.U.multiply(sqrtEigenMatrix).multiply(svdMatrix.V.transpose)
-  }
-
-
-  private def orthogonalize(matrix: BDM[Double])
-  : (BDV[Double], BDM[Double]) = {
-    val eigObj = eig.apply(matrix)
-    (eigObj.eigenvalues, eigObj.eigenvectors)
-  }
-
-
-
+PCAModel
 
   /** Transform the matrix to a white matrix. */
-  private def whiteMatrix(matrix: RowMatrix, colNums: Long, rowNums: Long) = {
-    val meanScaleMatrix = standardWithMean(matrix)
-    val svdNums = getSuperNums(colNums.toInt)
-    val principalModel = computePrincipalModel(meanScaleMatrix, svdNums)
-    val whiteMatrix = principalModel.pc
+  def whiteMatrix(xMatrix: RowMatrix) = {
+    val meanScaleMatrix = standardWithMean(xMatrix)
+    val svdNums = getICANums(xMatrix.numCols().toInt)
+    val whiteMatrix: Matrix = meanScaleMatrix.computePrincipalComponents(svdNums)
 
-    val whiteFeatures = principalModel.transform(matrix.rows)
-    (whiteFeatures, whiteMatrix)
-  }
-
-  def fit(matrix: RowMatrix): ICAmodel = {
-
-    val colNums = matrix.numCols()
-    val rowNums = matrix.numRows()
-    require(checkNums(colNums, rowNums), "The num of components " +
-      "should be not bigger than colNums and rowNums.The max number here" +
-      s" is ${math.min(colNums, rowNums)}")
-
-    val tol = 1e-10
-    val whiteModel = whiteMatrix(matrix: RowMatrix, colNums: Long, rowNums: Long)
-    val whiteFeatures: RDD[Vector] = whiteModel._1
-
-
-    val W: BDM[Double] = initialWeight(colNums)
-
-
-    projectionPursuit(whiteFeatures)
-
-
-  }
-
-
-
-  private def initialWeight(pColNums: Int): Matrix = {
-    val rd = new util.Random()
-    val weightArr = Array
-      .tabulate(componetNums*pColNums)(_ => rd.nextDouble())
-
-    new DenseMatrix(pColNums, componetNums, weightArr)
-  }
-
-
-
-  private def subtract(x1: DenseMatrix, x2: DenseMatrix): DenseMatrix = {
-    new DenseMatrix(x1.numCols, x1.numRows, x1.values.zip(x2.values).map{
-      case (d1, d2) => d1 - d2
+    val s  = whiteMatrix.transpose
+    val zMatrix: RDD[Vector] = xMatrix.rows.map(vec => {
+      whiteMatrix.transpose.multiply(new DenseVector(vec.toArray))
     })
+    (new RowMatrix(zMatrix), whiteMatrix)
   }
 
-
-  private def projectionPursuit(matrix: RDD[Vector],
-                                initialWeight: Matrix,
-                                pColNums: Int, rowNums: Int) = {
-    var W_old = initialWeight.copy
-    var W = initialWeight.copy
-    val x = new RowMatrix(matrix)
-
-    var xw = x.multiply(W)
-    val wGwX = xw.rows.map(x => {
-      val gwx = x.toArray.map(e => e*math.tanh(e))
-      Vectors.dense(x.toArray.flatMap(d => gwx.map(_*d)))
-    }).sample(false, fraction, seed)
-
-    val E_Gx_Arr = new RowMatrix(wGwX).computeColumnSummaryStatistics()
-      .mean.toArray
-
-    val E_Gx = new DenseMatrix(componetNums, pColNums, E_Gx_Arr)
-
-    val E_Gdx = xw.rows.map(v => {
-      val u = v.toArray.map(d =>
-      1 - math.tanh(d)*math.tanh(d))
-      Vectors.dense(u)
-    }).sample(false, fraction, seed)
-
-    val gdx_arr: BDV[Double] = new RowMatrix(E_Gdx)
-      .computeColumnSummaryStatistics().mean.toBreeze.toDenseVector
-    val diag_gdx = new DenseMatrix(componetNums, pColNums, diag(gdx_arr).data)
-
-
-    val s1 = W.multiply(diag_gdx)
-    val s2 = E_Gx
-
-    val s = subtract(E_Gx, s1).toBreeze.asInstanceOf[BDM[Double]]
-    orthogonalize(s)._2.toDenseMatrix
-    W = new DenseMatrix(orthogonalize(s)._2.cols, orthogonalize(s)._2.rows, orthogonalize(s)._2.data)
-
-    // 当W方向收敛时认为收敛
-    W_old.
-    val distance = W.multiply()
-
-  }
-
+//  def fit(matrix: RowMatrix): ICAmodel = {
+//
+//    val colNums = matrix.numCols()
+//    val rowNums = matrix.numRows()
+//    require(checkNums(colNums, rowNums), "The num of components " +
+//      "should be not bigger than colNums and rowNums.The max number here" +
+//      s" is ${math.min(colNums, rowNums)}")
+//
+//    val tol = 1e-10
+//    val whiteModel = whiteMatrix(matrix: RowMatrix, colNums: Long, rowNums: Long)
+//    val whiteFeatures: RDD[Vector] = whiteModel._1
+//
+//
+//    val W: BDM[Double] = initialWeight(colNums)
+//
+//
+//    projectionPursuit(whiteFeatures)
+//
+//
+//  }
+//
+//
+//
+//  private def initialWeight(pColNums: Int): Matrix = {
+//    val rd = new util.Random()
+//    val weightArr = Array
+//      .tabulate(componetNums*pColNums)(_ => rd.nextDouble())
+//
+//    new DenseMatrix(pColNums, componetNums, weightArr)
+//  }
+//
+//
+//
+//  private def subtract(x1: DenseMatrix, x2: DenseMatrix): DenseMatrix = {
+//    new DenseMatrix(x1.numCols, x1.numRows, x1.values.zip(x2.values).map{
+//      case (d1, d2) => d1 - d2
+//    })
+//  }
+//
+//
+//  private def projectionPursuit(matrix: RDD[Vector],
+//                                initialWeight: Matrix,
+//                                pColNums: Int, rowNums: Int) = {
+//    var W_old = initialWeight.copy
+//    var W = initialWeight.copy
+//    val x = new RowMatrix(matrix)
+//
+//    var xw = x.multiply(W)
+//    val wGwX = xw.rows.map(x => {
+//      val gwx = x.toArray.map(e => e*math.tanh(e))
+//      Vectors.dense(x.toArray.flatMap(d => gwx.map(_*d)))
+//    }).sample(false, fraction, seed)
+//
+//    val E_Gx_Arr = new RowMatrix(wGwX).computeColumnSummaryStatistics()
+//      .mean.toArray
+//
+//    val E_Gx = new DenseMatrix(componetNums, pColNums, E_Gx_Arr)
+//
+//    val E_Gdx = xw.rows.map(v => {
+//      val u = v.toArray.map(d =>
+//      1 - math.tanh(d)*math.tanh(d))
+//      Vectors.dense(u)
+//    }).sample(false, fraction, seed)
+//
+//    val gdx_arr: BDV[Double] = new RowMatrix(E_Gdx)
+//      .computeColumnSummaryStatistics().mean.toBreeze.toDenseVector
+//    val diag_gdx = new DenseMatrix(componetNums, pColNums, diag(gdx_arr).data)
+//
+//
+//    val s1 = W.multiply(diag_gdx)
+//    val s2 = E_Gx
+//
+//    val s = subtract(E_Gx, s1).toBreeze.asInstanceOf[BDM[Double]]
+//    orthogonalize(s)._2.toDenseMatrix
+//    W = new DenseMatrix(orthogonalize(s)._2.cols, orthogonalize(s)._2.rows, orthogonalize(s)._2.data)
+//
+//    // 当W方向收敛时认为收敛
+//    W_old.
+//    val distance = W.multiply()
+//
+//  }
 
 
 
@@ -261,7 +236,14 @@ class fastICA(private var componetNums: Int, private var runs: Int,
 }
 
 
-class ICAmodel extends VectorTransformer {
-  val A = 0
-  override def transform(vector: Vector)
-}
+//class ICAmodel extends VectorTransformer {
+//  var PCAMatrix: Matrix = DenseMatrix
+//    .diag(Vectors.dense(Array.range(0, 10).map(_.toDouble)))
+//
+//  def setPcaMatrix(mt: Matrix) = {
+//    PCAMatrix = mt
+//  }
+//
+//
+//  override def transform(vector: Vector)
+//}

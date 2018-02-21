@@ -5,7 +5,7 @@ import org.apache.spark.rdd.RDD
 //import org.apache.spark.util.Utils
 import org.apache.spark.mllib.clustering.KMeansModel
 import org.apache.spark.storage.StorageLevel
-import org.apache.spark.Logging
+import org.apache.spark.internal.Logging
 import org.apache.spark.util.random.XORShiftRandom
 import org.apache.spark.mllib.linalg.BLAS.{axpy, scal}
 import scala.collection.mutable.{Map => mutableMap}
