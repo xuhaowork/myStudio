@@ -97,7 +97,7 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
     this
   }
 
-  private def getICANums(colNums: Int): Int = {
+  private def getPCANums(colNums: Int): Int = {
     if(this.whiteMatrixByPCA._1){
       val PCANums = this.whiteMatrixByPCA._2
       require(colNums >= PCANums && PCANums >= this.componetNums,
@@ -153,9 +153,10 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
       s" should be no bigger than the num of principal components.")
 
     // White the matrix, x => z = K*x, x dimensions is n*1, z dimensions is p*1.
-    val p: Int = getICANums(xMatrix.numCols().toInt)
+    val p: Int = getPCANums(xMatrix.numCols().toInt)
     val whiteModel = whiteMatrix(xMatrix: RowMatrix, p)
-    val K = whiteModel._2
+    // We define the PCA matrix as its' transpose to be in consistent with ICA matrix.
+    val K: Matrix = whiteModel._2.transpose
     val zMatrix = whiteModel._1
 
     // Initial the matrix W, s.
@@ -229,11 +230,10 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
     G * recSqrtMatrix
   }
 
-
 }
 
 
-class ICAModel(val PCAMatrix: Matrix, ICAMatrix: Matrix) extends VectorTransformer {
+class ICAModel(val PCAMatrix: Matrix, val ICAMatrix: Matrix) extends VectorTransformer {
   override def transform(vector: Vector) = {
     ICAMatrix.multiply(PCAMatrix.asInstanceOf[DenseMatrix]).multiply(vector)
   }
