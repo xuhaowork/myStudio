@@ -1,7 +1,7 @@
 package com.self.core.syntax
 
 import com.self.core.baseApp.myAPP
-
+import org.apache.spark.deploy.master.Master
 
 object learningObject extends myAPP with Serializable {
   override def run: Unit = {
