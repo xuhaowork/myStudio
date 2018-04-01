@@ -29,7 +29,7 @@ object LearningSQL extends myAPP{
 
     df = df.withColumn("gmtStart", lit("1970-01-01"))
 
-    val paste = udf((s1: String, s2: String) => s1 + " " + s2)
+    val paste = udf((s1: String, s2: String) => s1 + "," + s2)
     df = df
       .withColumn("binnerTime", paste(col("gmtStart"), col("dayTime")))
       .withColumn("binnerStampTime", unix_timestamp(col("binnerTime"), "yyyy-MM-dd HH:mm:ss").+(28800))

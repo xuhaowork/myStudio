@@ -8,9 +8,6 @@ package src.com.self.core.geoHash
   * 实现：编码到二进制数、编码到字符串、从二进制数解码、从字符串解码方法
   */
 class GeoHash(val hashLength: Int = 9) extends Serializable {
-  /** 经纬度的迭代次数 */
-  val iterNumsInfo = GeoIterNumsInfo(hashLength * 5 - hashLength / 2 *5, hashLength / 2 *5)
-
   /** Base32编码 */
   val digits: Array[Char] = Array(
     '0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -63,8 +60,8 @@ class GeoHash(val hashLength: Int = 9) extends Serializable {
   }
 
 
-  /** 九点编码 */
-  def encodeWith9Points(longitude: Double, latitude: Double): String = {
+  /** 返回的是Array形式, 方便九点编码获取周围的八个点 */
+  def encodeByArr(longitude: Double, latitude: Double): String = {
     var i = 0
     var flag = true // true时对纬度二分, 否则对经度二分, 以经度二分开头
     var (lgLower: Double, lgUpper: Double) = longitudeRange
