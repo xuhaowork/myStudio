@@ -2,3 +2,5 @@
 /myProject/out/production/*
 /myProject/core/*.iml
 /myProject/base/*.iml
+/myProject/*.class
+*.class
