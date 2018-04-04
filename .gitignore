@@ -2,3 +2,5 @@
 /myProject/*.class
 *.class
 /myproject/out/production/core/com/self/core/testBaseApp/*.class
+/myproject/core/*.iml
+/myproject/core/core.iml

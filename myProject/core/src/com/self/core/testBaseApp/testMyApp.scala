@@ -2,6 +2,7 @@ package com.self.core.testBaseApp
 
 
 import com.self.core.baseApp.myAPP
+import org.joda.time.DateTime
 //import com.self.core.syntax.learningPrivate
 import scala.collection.mutable.ArrayBuffer
 
@@ -62,6 +63,14 @@ object testMyApp extends myAPP with Serializable {
 
     println(Integer.valueOf("0000000000000000001", 2))
 
+
+    import java.text.SimpleDateFormat
+    val format = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    val u = format.parse("2018-3-2 00:10:00")
+    val dt = new DateTime(u.getTime)
+
+    println(dt)
+    println(dt.monthOfYear().roundFloorCopy())
 
 
 
