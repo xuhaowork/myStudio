@@ -4,3 +4,5 @@
 /myproject/out/production/core/com/self/core/testBaseApp/*.class
 /myproject/core/*.iml
 /myproject/core/core.iml
+/myproject/out/
+/myProject/core/*.iml
