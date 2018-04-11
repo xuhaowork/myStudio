@@ -155,13 +155,13 @@ object testMyApp extends myAPP with Serializable {
     val rdd = sc.parallelize(arr, 10)
 
     val groupRdd = rdd.map(arr => (m(arr._1), arr._2))
-    ////    groupRdd.groupByKey().foreach(println)
-    //
-    //    val newRdd = groupRdd.groupByKey().mapValues(iter => {
-    //      val filterIter = iter.filter(i => i >= 100)
-    //      filterIter
-    //    })
-    //    newRdd.foreach(println)
+    //    groupRdd.groupByKey().foreach(println)
+
+    val newRdd = groupRdd.groupByKey().mapValues(iter => {
+      val filterIter = iter.filter(i => i >= 100)
+      filterIter
+    })
+    newRdd.foreach(println)
 
 //    /**
 //      * 找出大于100的值
