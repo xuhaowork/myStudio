@@ -185,4 +185,14 @@ class CoxPH(private var epsilon: Double,
 
 
 
+
+  def alphaJ(data: RDD[(Double, (Vector, Double))], beta: Vector) = {
+    val timeGroup = data.mapValues{case (x, alpha) => math.exp(dot(x, beta))/(1 - math.exp(math.log(alpha)*math.exp(dot(x, beta))))}.reduceByKey{
+      case (dot1, dot2) => dot1 + dot2
+    }
+
+  }
+
+
+
 }
