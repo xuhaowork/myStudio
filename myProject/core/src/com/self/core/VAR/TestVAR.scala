@@ -48,17 +48,6 @@ object TestVAR extends myAPP{
     val endTimeStamp = timeParser.parse(endTime).getTime
 
     val frequencyFormat = "fixedLength" // fixedLength, naturalLength
-    val frequencyLength = "10"
-    val unit = "week"
-
-    val frequency: Int = { util.Try(frequencyLength.toInt) getOrElse 1 } * (unit match {
-      case "week" => 604800000
-      case "day" => 86400000
-      case "hour" => 3600000
-      case "minute" => 60000
-      case "second" => 1000
-      case "microsecond" => 1
-    })
 
     // 特征列
     val featureCols: ArrayBuffer[(String, String)] = ArrayBuffer(("x", "int"), ("y", "int"), ("z", "int"))
@@ -116,7 +105,7 @@ object TestVAR extends myAPP{
     rawDataDF.show()
 
     if(hasIdCol == "true"){
-      val rawRdd = rawDataDF.rdd.map(r => {
+      val rawRdd = rawDataDF.rdd.map(f = r => {
         val id: String = idColType match {
           case "int" => util.Try(r.getAs[Int](idColName).toString) getOrElse null
           case "float" => util.Try(r.getAs[Float](idColName).toString) getOrElse null
@@ -124,7 +113,7 @@ object TestVAR extends myAPP{
           case "string" => util.Try(r.getAs[String](idColName).toString) getOrElse null
         }
 
-        val arr = featureCols.map{
+        val arr = featureCols.map {
           case (name, colType) => colType match {
             case "int" => util.Try(r.getAs[Int](name).toDouble) getOrElse 0.0
             case "float" => util.Try(r.getAs[Float](name).toDouble) getOrElse 0.0
@@ -136,12 +125,47 @@ object TestVAR extends myAPP{
         val time = util.Try(r.getAs[Long](newTimeCol)) getOrElse 0L // 时间
 
         /** 时间转换 => 按给定的时间序列频率规则给出一个分界时间 & 还有和分界时间的时间差(当冲突时取最近时间的记录) */
-        val dt = new DateTime(time)
-        val roundTime = dt.yearOfCentury().roundFloorCopy().getMillis
-        val modTime = time - roundTime
+        val (roundTime: Long, modTime: Long) = frequencyFormat match {
+          case "fixedLength" => {
+            val frequencyLength = "10"
+            val unit = "week"
+            val frequency: Int = {
+              util.Try(frequencyLength.toInt) getOrElse 1
+            } * (unit match {
+              case "week" => 604800000
+              case "day" => 86400000
+              case "hour" => 3600000
+              case "minute" => 60000
+              case "second" => 1000
+              case "microsecond" => 1
+            })
+            ((time - startTimeStamp) / frequency, (time - startTimeStamp) % frequency)
+          }
+          case "naturalLength" => {
+            val unit = "week" // weekday, month, year, season
+            val dt = new DateTime(time)
+            val roundTime = unit match {
+              case "year" => dt.yearOfCentury().roundFloorCopy().getMillis
+              case "month" => dt.monthOfYear().roundFloorCopy().getMillis
+              case "season" => {
+                val minus_month = (dt.getMonthOfYear - 1) % 3
+                dt.minusMonths(minus_month).monthOfYear().roundFloorCopy().getMillis
+              }
+              case "week" => (time - startTimeStamp) / 604800000
+              case "weekday" => {
+                val day_time = (time - startTimeStamp) / 86400000
+                val minus_day = day_time % 7 - 4
+                day_time - minus_day * 86400000
+              }
+            }
+            (roundTime, time - roundTime)
+          }
+        }
         ((id, roundTime), (modTime, arr))
       })
 
+
+      rawRdd.foreach(println)
 
     }
 
