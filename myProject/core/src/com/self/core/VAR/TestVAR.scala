@@ -40,12 +40,12 @@ object TestVAR extends myAPP {
       */
     val timeCol = "dayTime"
     val fieldFormat = "StringType"
-    val timeFormat = "yyyy-MM-dd HH:mm:ss"
 
     val intervalType = "byHand" // 按最大最小时间平滑 --sliding
 
 
-    val frequencyFormat = "fixedLength" // fixedLength, naturalLength
+//    val frequencyFormat = "fixedLength" // fixedLength, naturalLength
+    val frequencyFormat = "naturalLength" // fixedLength, naturalLength
 
     // 特征列
     val featureCols: ArrayBuffer[(String, String)] = ArrayBuffer(("x", "int"), ("y", "int"), ("z", "int"))
@@ -58,21 +58,36 @@ object TestVAR extends myAPP {
     /**
       * 2. 模拟数据
       */
-    val arr = List(
-      Array("1", "2017-12-10 00:00:00", 123, -150, -150),
-      Array("1", "2017-12-10 00:01:01", 9, -150, -150),
-      Array("1", "2017-12-10 00:03:00", 19, -10, -150),
-      Array("1", "2017-12-10 00:01:01", 19, -150, -150),
-      Array("1", "2017-12-10 00:02:00", 199, 50, -150),
-      Array("1", "2017-12-10 00:04:00", 199, -150, -150),
-      Array("1", "2017-12-10 00:09:00", 199, 0, 0),
-      Array("2", "2017-12-10 00:07:00", 99, 0, -150),
-      Array("2", null, 199, -150, -150),
-      Array("2", "2017-12-10 00:01:00", 1, -50, -15),
-      Array("2", "2017-12-10 00:02:02", 90, -0, -1),
-      Array("2", "2017-12-10 00:02:02", 19, -50, -15))
+    //    val arr = List(
+    //      Array("1", "2017-12-10 00:00:00", 123, -150, -150),
+    //      Array("1", "2017-12-10 00:01:01", 9, -150, -150),
+    //      Array("1", "2017-12-10 00:03:00", 19, -10, -150),
+    //      Array("1", "2017-12-10 00:01:01", 19, -150, -150),
+    //      Array("1", "2017-12-10 00:02:00", 199, 50, -150),
+    //      Array("1", "2017-12-10 00:04:00", 199, -150, -150),
+    //      Array("1", "2017-12-10 00:09:00", 199, 0, 0),
+    //      Array("2", "2017-12-10 00:07:00", 99, 0, -150),
+    //      Array("2", null, 199, -150, -150),
+    //      Array("2", "2017-12-10 00:01:00", 1, -50, -15),
+    //      Array("2", "2017-12-10 00:02:02", 90, -0, -1),
+    //      Array("2", "2017-12-10 00:02:02", 19, -50, -15))
 
-    val rdd = sc.parallelize(arr).map(Row.fromSeq(_))
+
+    val arr2 = List(
+      Array("1", "2017-01", 123, -150, -150),
+      Array("1", "2017-02", 9, -150, -150),
+      Array("1", "2017-02", 19, -10, -150),
+      Array("1", "2017-03", 19, -150, -150),
+      Array("1", "2017-07", 199, 50, -150),
+      Array("1", "2017-05", 199, -150, -150),
+      Array("1", "2017-07", 199, 0, 0),
+      Array("2", "2017-01", 99, 0, -150),
+      Array("2", null, 199, -150, -150),
+      Array("2", "2017-02", 1, -50, -15),
+      Array("2", "2017-05", 90, -0, -1),
+      Array("2", "2017-06", 19, -50, -15))
+
+    val rdd = sc.parallelize(arr2).map(Row.fromSeq(_))
     var rawDataDF = sqlc.createDataFrame(rdd, StructType(
       Array(StructField("id", StringType),
         StructField("dayTime", StringType),
@@ -90,6 +105,8 @@ object TestVAR extends myAPP {
         if (col_type != StringType) {
           throw new Exception(s"$timeCol 不是 StringType")
         } else {
+//          val timeFormat = "yyyy-MM-dd HH:mm:ss"
+          val timeFormat = "yyyy-MM"
           rawDataDF.withColumn(newTimeCol, unix_timestamp(col(timeCol), timeFormat).*(1000))
         }
       case "TimeStampType" =>
@@ -108,16 +125,18 @@ object TestVAR extends myAPP {
 
     val (startTimeStamp: Long, endTimeStamp: Long) = util.Try(intervalType match {
       case "byHand" => {
-        val startTime = "2017-12-10 00:00:00"
-        val endTime = "2017-12-11 00:10:00"
-        val timeParser = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+//        val startTime = "2017-12-10 00:00:00"
+//        val endTime = "2017-12-11 00:10:00"
+        val startTime = "2017-1"
+        val endTime = "2017-12"
+        val timeParser = new SimpleDateFormat("yyyy-MM")
         (timeParser.parse(startTime).getTime, timeParser.parse(endTime).getTime)
       }
       case "sliding" => {
         val minMax: DataFrame = rawDataDF.select(max(col(newTimeCol)).alias("max"), max(col(newTimeCol)).alias("max"))
         minMax.rdd.map(r => (r.getAs[Long](0), r.getAs[Long](1))).collect().head
       }
-    }) getOrElse(throw new Exception("类型不对"))
+    }) getOrElse (throw new Exception("类型不对"))
 
 
     def getZeroValue(frequencyFormat: String, startTimeStamp: Long, endTimeStamp: Long)
@@ -138,7 +157,7 @@ object TestVAR extends myAPP {
         (startTimeStamp to endTimeStamp by frequency).toArray
       }
       case "naturalLength" => {
-        val unit = "week" // weekday, month, year, season
+        val unit = "month" // weekday, month, year, season
         if (unit == "week") {
           Array.range(startTimeStamp.toInt, endTimeStamp.toInt, 604800000).map(_.toLong)
         } else if (unit == "weekday") {
@@ -146,7 +165,7 @@ object TestVAR extends myAPP {
             .flatMap(monday => Array.tabulate(5)(i => monday.toLong + i * 86400000))
         } else {
           val arr = ArrayBuffer.empty[Long]
-          var flashTime = startTimeStamp
+          var flashTime = 0L
           var i = 1
           val dt = new DateTime(startTimeStamp)
           while (flashTime < endTimeStamp) {
@@ -156,10 +175,11 @@ object TestVAR extends myAPP {
                 flashTime = dt.plusYears(i).yearOfCentury().roundFloorCopy().getMillis
               }
               case "month" => {
-                flashTime = dt.plusMonths(i).yearOfCentury().roundFloorCopy().getMillis
+                flashTime = dt.plusMonths(i).monthOfYear().roundFloorCopy().getMillis
+                println(flashTime, ":", endTimeStamp)
               }
               case "season" => {
-                flashTime = dt.plusMonths(i * 3).yearOfCentury().roundFloorCopy().getMillis
+                flashTime = dt.plusMonths(i * 3).monthOfYear().roundFloorCopy().getMillis
               }
               case _ => throw new Exception("您输入的模式不在year/month/season/week/weekday中")
             }
@@ -208,7 +228,7 @@ object TestVAR extends myAPP {
           ((time - startTimeStamp) / frequency * frequency + startTimeStamp, (time - startTimeStamp) % frequency)
         }
         case "naturalLength" => {
-          val unit = "week" // weekday, month, year, season
+          val unit = "month" // weekday, month, year, season
           val dt = new DateTime(time)
           val roundTime = unit match {
             case "year" => dt.yearOfCentury().roundFloorCopy().getMillis
@@ -235,6 +255,7 @@ object TestVAR extends myAPP {
     val zeroValue: Map[Long, (Long, Array[Double])] = getZeroValue(frequencyFormat, startTimeStamp, endTimeStamp)
       .map(roundTime => (roundTime, (Long.MaxValue, Array.fill(K)(Double.NaN)))).toMap
 
+    println(zeroValue)
 
     val u: RDD[(String, DenseMatrix[Double])] = rawRdd.groupByKey().mapValues(iter => {
       var buffer = zeroValue
@@ -266,7 +287,6 @@ object TestVAR extends myAPP {
     //      })
 
   }
-
 
 
 }
