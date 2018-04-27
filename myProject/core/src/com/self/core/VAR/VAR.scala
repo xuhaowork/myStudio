@@ -1,8 +1,12 @@
 package com.self.core.VAR
 
 
+import breeze.linalg.operators.OpSet
 import breeze.linalg.{inv, DenseMatrix => BDM}
+import breeze.storage.Zero
+
 import scala.collection.mutable.ArrayBuffer
+import scala.reflect.ClassTag
 
 
 class VAR(val P: Int, val pSteps: Int) extends Serializable {
@@ -63,7 +67,7 @@ class VAR(val P: Int, val pSteps: Int) extends Serializable {
       new BDM(K, K, data)
     })
 
-    new VARModel(K, P, coefficient, index)
+    new VARModel(K, P, coefficient)
   }
 
   /**
@@ -92,18 +96,25 @@ class VAR(val P: Int, val pSteps: Int) extends Serializable {
 
 }
 
-class VARModel(val K: Int, val P: Int, val coefficient: Array[BDM[Double]], val index: Map[(Int, Int), Int]) extends Serializable {
-  /**
-    * T * K 和 K * K => T * K
-    */
-  def fit(lagData: BDM[Double], pSteps: Int): BDM[Double] = {
-    val firstP = lagData(0 until P, (0 until K).map(index(_, 0)).indices).toDenseMatrix
-    val fitMatrix = coefficient.zipWithIndex.map {
-      case (coef, p) =>
-        lagData(::, (0 until K).map(k => index(k, p + 1))).toDenseMatrix * coef.t
-    }.reduce(_ + _)
-    val forecast = markov(firstP, pSteps)
-    BDM.vertcat(fitMatrix, forecast)
+class VARModel(val K: Int, val P: Int, val coefficient: Array[BDM[Double]]) extends Serializable {
+  //  /**
+  //    * T * K 和 K * K => T * K
+  //    */
+  def fit(rawData: BDM[Double]): BDM[Double] = {
+    var i = 0
+    val buffer = ArrayBuffer.empty[BDM[Double]]
+    while(i < rawData.rows - P) {
+      val fitMatrix = coefficient.zipWithIndex.map {
+        case (coef, p) => {
+          val newBV = rawData(i + P - p, ::).inner.toDenseMatrix
+          val multiV = coef * newBV.t
+          multiV.t
+        }
+      }.reduce(_ + _)
+      buffer += fitMatrix
+      i += 1
+    }
+    BDM.vertcat(buffer:_*)
   }
 
   def markov(firstP: BDM[Double], pSteps: Int)
@@ -111,17 +122,20 @@ class VARModel(val K: Int, val P: Int, val coefficient: Array[BDM[Double]], val 
     var bv = firstP
     require(firstP.rows >= coefficient.length, "markov过程需要输入的时间数不能少于模型要求的滞后阶数")
     require(firstP.cols == coefficient.head.rows && coefficient.head.rows == K, "模型系数以及输入的数据纬度和K需要一致")
+    var bvLength = firstP.rows
+
     var i = 0
     while (i < pSteps) {
       val fitMatrix = coefficient.zipWithIndex.map {
         case (coef, p) => {
-          val newBV = bv(p, ::).inner.toDenseMatrix
+          val newBV = bv(bvLength - p - 1, ::).inner.toDenseMatrix
           val multiV = coef * newBV.t
           multiV.t
         }
       }.reduce(_ + _)
       bv = BDM.vertcat(bv, fitMatrix)
       i += 1
+      bvLength += 1
     }
     bv
   }
