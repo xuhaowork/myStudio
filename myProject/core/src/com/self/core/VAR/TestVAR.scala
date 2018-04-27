@@ -10,6 +10,7 @@ import org.apache.spark.sql.functions._
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.types._
 
+import scala.collection.Iterator
 import scala.collection.mutable.ArrayBuffer
 
 object TestVAR extends myAPP {
@@ -22,10 +23,8 @@ object TestVAR extends myAPP {
     val (idColName, idColType) = ("id", "string")
 
     // 2.时间序列信息
-    val timeColFormat = "true"
     /** 分为三种：
-      * 1)无时间列 => 以数据顺序为时间序列; false
-      * 2)有时间列; true
+      * 默认有时间列; true
       *     A.输入时间列名                       || timeCol
       *     B.输入字段类型                       || fieldFormat -- StringType, UTC, TimeStampType
       *     B.输入时间列格式                     || timeFormat
@@ -52,7 +51,7 @@ object TestVAR extends myAPP {
 
     val K = featureCols.length
 
-    val naFill = "zero" // "nearest" "next" "previous" "spline" "zero"
+    val naFill = "linear" // "linear" "nearest" "next" "previous" "spline" "zero"
 
 
     /**
@@ -78,14 +77,27 @@ object TestVAR extends myAPP {
       Array("1", "2017-02", 9, -150, -150),
       Array("1", "2017-02", 19, -10, -150),
       Array("1", "2017-03", 19, -150, -150),
-      Array("1", "2017-07", 199, 50, -150),
-      Array("1", "2017-05", 199, -150, -150),
-      Array("1", "2017-07", 199, 0, 0),
-      Array("2", "2017-01", 99, 0, -150),
+      Array("1", "2017-07", 1, 50, -150),
+      Array("1", "2017-05", 199, -8, -150),
+      Array("1", "2017-07", 120, 7, 0),
+      Array("1", "2017-08", 199, 0, 197),
+      Array("1", "2017-09", -200, 100, 50),
+      Array("1", "2017-10", 60, 50, 0),
+      Array("1", "2017-11", 199, 98, 0),
+      Array("1", "2017-12", 100, 0, 10),
+      Array("2", "2017-01", 99, -70, -150),
       Array("2", null, 199, -150, -150),
       Array("2", "2017-02", 1, -50, -15),
       Array("2", "2017-05", 90, -0, -1),
-      Array("2", "2017-06", 19, -50, -15))
+      Array("2", "2017-06", 19, -50, -15),
+      Array("2", null, 199, -150, -150),
+      Array("2", "2017-03", 1, -50, -15),
+      Array("2", "2017-07", 90, -0, -1),
+      Array("2", "2017-08", 19, -50, -15),
+      Array("2", "2017-09", 1, -50, -15),
+      Array("2", "2017-10", 90, -0, -1),
+      Array("2", "2017-11", 19, -50, -15)
+    )
 
     val rdd = sc.parallelize(arr2).map(Row.fromSeq(_))
     var rawDataDF = sqlc.createDataFrame(rdd, StructType(
@@ -165,21 +177,20 @@ object TestVAR extends myAPP {
             .flatMap(monday => Array.tabulate(5)(i => monday.toLong + i * 86400000))
         } else {
           val arr = ArrayBuffer.empty[Long]
-          var flashTime = 0L
+          var flashTime = startTimeStamp
           var i = 1
           val dt = new DateTime(startTimeStamp)
           while (flashTime < endTimeStamp) {
             arr += flashTime
             unit match {
               case "year" => {
-                flashTime = dt.plusYears(i).yearOfCentury().roundFloorCopy().getMillis
+                flashTime = dt.plusYears(i).getMillis
               }
               case "month" => {
-                flashTime = dt.plusMonths(i).monthOfYear().roundFloorCopy().getMillis
-                println(flashTime, ":", endTimeStamp)
+                flashTime = dt.plusMonths(i).getMillis
               }
               case "season" => {
-                flashTime = dt.plusMonths(i * 3).monthOfYear().roundFloorCopy().getMillis
+                flashTime = dt.plusMonths(i * 3).getMillis
               }
               case _ => throw new Exception("您输入的模式不在year/month/season/week/weekday中")
             }
@@ -250,14 +261,13 @@ object TestVAR extends myAPP {
       (id, (roundTime, modTime, arr.toArray))
     })
 
-    rawRdd.foreach(println)
 
     val zeroValue: Map[Long, (Long, Array[Double])] = getZeroValue(frequencyFormat, startTimeStamp, endTimeStamp)
       .map(roundTime => (roundTime, (Long.MaxValue, Array.fill(K)(Double.NaN)))).toMap
 
-    println(zeroValue)
 
-    val u: RDD[(String, DenseMatrix[Double])] = rawRdd.groupByKey().mapValues(iter => {
+    import MatrixNAFillImplicit._
+    val u = rawRdd.groupByKey().mapValues(iter => {
       var buffer = zeroValue
       val iterator = iter.toIterator
       while (iterator.hasNext) {
@@ -265,10 +275,29 @@ object TestVAR extends myAPP {
         if ((buffer contains roundTime) && buffer(roundTime)._1 > modTime)
           buffer += (roundTime -> (modTime, feature))
       }
-      buffer.toArray.sortBy(_._1).map(_._2._2)
-    }).mapValues(arr => ColNAFill.fillByCols(arr, naFill, true))
+      buffer.toArray.sortBy(_._1).map(_._2._2).toDenseMatrix(false)
+    })
 
-    u.foreach(println)
+    val s = u.mapValues(arr => {
+      arr.fillByCols(naFill)
+    })
+
+//      .mapValues(arr => arr.fillByCols(naFill, true).toDenseMatrix(false))
+
+    s.foreach(println) // true
+
+
+    /** 最大滞后阶数 */
+    val maxLag: Int = util.Try("2".toInt) getOrElse 1
+
+
+    val varTrain = new VAR(2, 3)
+    s.mapValues(bm => {
+      val varModel: VARModel = varTrain.run(bm)
+      varModel.fit(bm, 3)
+    }).foreach(println)
+
+
 
 
     //      rawRdd.aggregateByKey(zeroValue)(seqOp = {
@@ -285,6 +314,11 @@ object TestVAR extends myAPP {
     //        }
     //
     //      })
+
+
+
+
+
 
   }
 

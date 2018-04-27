@@ -10,63 +10,54 @@ import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV, Vector => BV}
   * 1）对breeze的DenseVector的缺失值进行补全
   * 2）对breeze的DenseMatrix类型的元素进行缺失值补全（稀疏矩阵当然要变为DenseMatrix才能补全）
   */
-object ColNAFill {
+object MatrixNAFillImplicit extends Serializable {
 
   /**
-    * @param arr 为二维向量，默认从外道第一维为列，第二维为行
+    * @param values 为二维向量，默认从外道第一维为列，第二维为行
     *            即："Array[ Array[Double] ]"里面的Array[Double]代表列, storedByCols为true即数据按列储存
     */
-  implicit class ArrayToDenseMatrix(val arr: Array[Array[Double]]){
+  implicit class ArrayToDenseMatrix(val values: Array[Array[Double]]){
     def toDenseMatrix(storedByCols: Boolean = true): BDM[Double] = {
-      val cols = arr.length
-      val rows = arr.head.length
+      val cols = values.length
+      val rows = values.head.length
       if(storedByCols)
-        new BDM(rows, cols, arr.flatten)
+        new BDM(rows, cols, values.flatten)
       else
-        new BDM(rows, cols, arr.flatten, 0, cols, true)
+        new BDM(cols, rows, values.flatten, 0, rows, true)
     }
+
+    def fillByCols(fillMethod: String, storedByCols : Boolean = true): Array[Array[Double]] = {
+      val arrayArray = if(storedByCols) values else values.transpose
+      arrayArray.map(fillArray(_, fillMethod))
+    }
+
+    def fillByRows(fillMethod: String, storedByCols : Boolean = true): Array[Array[Double]] = {
+      val arrayArray = if(! storedByCols) values else values.transpose
+      arrayArray.map(fillArray(_, fillMethod))
+    }
+
+
   }
 
   implicit class DenseMatrixToArrayArray(val bm: BDM[Double]){
     def toArrayArray: Array[Array[Double]] =
       if(bm.isTranspose)
-        Array.range(0, bm.size, bm.rows).map(start => bm.data.slice(start, start + bm.rows)).transpose
+        Array.range(0, bm.size, bm.cols)
+          .map(start => bm.data.slice(start, start + bm.cols)).transpose
       else
-        Array.range(0, bm.size, bm.rows).map(start => bm.data.slice(start, start + bm.rows))
+        Array.range(0, bm.size, bm.rows)
+          .map(start => bm.data.slice(start, start + bm.rows))
+
+    def fillByCols(fillMethod: String): BDM[Double] =
+      bm.toArrayArray.fillByCols(fillMethod).toDenseMatrix()
+
+    def fillByRows(fillMethod: String): BDM[Double] =
+      bm.toArrayArray.fillByRows(fillMethod).toDenseMatrix()
 
   }
 
 
-
-  def fillByCols(bm: BDM[Double], fillMethod: String): BDM[Double] =
-    fillByCols(bm.toArrayArray, fillMethod)
-
-
-  def fillByRows(bm: BDM[Double], fillMethod: String): BDM[Double] =
-    fillByRows(bm.toArrayArray, fillMethod)
-
-
-
-  /**
-    *
-    * @param values
-    * @param fillMethod
-    * @param isTranspose 是否转置
-    * @return
-    */
-  def fillByCols(values: Array[Array[Double]], fillMethod: String, isTranspose: Boolean = false): BDM[Double] = {
-    val arr = if(isTranspose) values.transpose else values
-    arr.map(fillArray(_, fillMethod)).toDenseMatrix()
-  }
-
-  def fillByRows(values: Array[Array[Double]], fillMethod: String, isTranspose: Boolean = false): BDM[Double] = {
-    val arr = if(!isTranspose) values.transpose else values
-    arr.map(fillArray(_, fillMethod)).toDenseMatrix()
-  }
-
-
-
-  def fillArray(ts: Array[Double], fillMethod: String): Array[Double] = {
+  private def fillArray(ts: Array[Double], fillMethod: String): Array[Double] = {
     fillMethod match {
       case "linear" => fillLinear(ts)
       case "nearest" => fillNearest(ts)
@@ -82,14 +73,14 @@ object ColNAFill {
   /**
     * Replace all NaNs with a specific value
     */
-  def fillValue(values: Array[Double], filler: Double): Array[Double] = {
+  private def fillValue(values: Array[Double], filler: Double): Array[Double] = {
     fillValue(new BDV[Double](values), filler).toArray
   }
 
   /**
     * Replace all NaNs with a specific value
     */
-  def fillValue(values: BV[Double], filler: Double): BDV[Double] = {
+  private def fillValue(values: BV[Double], filler: Double): BDV[Double] = {
     val result = values.copy.toArray
     var i = 0
     while (i < result.size) {
@@ -99,11 +90,11 @@ object ColNAFill {
     new BDV[Double](result)
   }
 
-  def fillNearest(values: Array[Double]): Array[Double] = {
+  private def fillNearest(values: Array[Double]): Array[Double] = {
     fillNearest(new BDV[Double](values)).toArray
   }
 
-  def fillNearest(values: BV[Double]): BDV[Double] = {
+  private def fillNearest(values: BV[Double]): BDV[Double] = {
     val result = values.copy.toArray
     var lastExisting = -1
     var nextExisting = -1
@@ -133,7 +124,7 @@ object ColNAFill {
     new BDV[Double](result)
   }
 
-  def fillPrevious(values: Array[Double]): Array[Double] = {
+  private def fillPrevious(values: Array[Double]): Array[Double] = {
     fillPrevious(new BDV[Double](values)).toArray
   }
 
@@ -141,7 +132,7 @@ object ColNAFill {
     * fills in NaN with the previously available not NaN, scanning from left to right.
     * 1 NaN NaN 2 Nan -> 1 1 1 2 2
     */
-  def fillPrevious(values: BV[Double]): BDV[Double] = {
+  private def fillPrevious(values: BV[Double]): BDV[Double] = {
     val result = values.copy.toArray
     var filler = Double.NaN // initial value, maintains invariant
     var i = 0
@@ -153,7 +144,7 @@ object ColNAFill {
     new BDV[Double](result)
   }
 
-  def fillNext(values: Array[Double]): Array[Double] = {
+  private def fillNext(values: Array[Double]): Array[Double] = {
     fillNext(new BDV[Double](values)).toArray
   }
 
@@ -161,7 +152,7 @@ object ColNAFill {
     * fills in NaN with the next available not NaN, scanning from right to left.
     * 1 NaN NaN 2 Nan -> 1 2 2 2 NaN
     */
-  def fillNext(values: BV[Double]): BDV[Double] = {
+  private def fillNext(values: BV[Double]): BDV[Double] = {
     val result = values.copy.toArray
     var filler = Double.NaN // initial value, maintains invariant
     var i = result.length - 1
@@ -173,14 +164,14 @@ object ColNAFill {
     new BDV[Double](result)
   }
 
-  def fillWithDefault(values: Array[Double], filler: Double): Array[Double] = {
+  private def fillWithDefault(values: Array[Double], filler: Double): Array[Double] = {
     fillWithDefault(new BDV[Double](values), filler).toArray
   }
 
   /**
     * fills in NaN with a default value
     */
-  def fillWithDefault(values: BV[Double], filler: Double): BDV[Double] = {
+  private def fillWithDefault(values: BV[Double], filler: Double): BDV[Double] = {
     val result = values.copy.toArray
     var i = 0
     while (i < result.length) {
@@ -190,23 +181,35 @@ object ColNAFill {
     new BDV[Double](result)
   }
 
-  def fillLinear(values: Array[Double]): Array[Double] = {
+  private def fillLinear(values: Array[Double]): Array[Double] = {
     fillLinear(new BDV[Double](values)).toArray
   }
 
-  def fillLinear(values: BV[Double]): BDV[Double] = {
+  private def fillLinear(values: BV[Double]): BDV[Double] = {
     val result = values.copy.toArray
     var i = 1
-    while (i < result.length - 1) {
+    while (i <= result.length - 1) {
       val rangeStart = i
-      while (i < result.length - 1 && result(i).isNaN) {
+      while (i <= result.length - 1 && result(i).isNaN) {
         i += 1
       }
       val before = result(rangeStart - 1)
-      val after = result(i)
-      if (i != rangeStart && !before.isNaN && !after.isNaN) {
+      if(i == result.length){
+        i = result.length - 1
+        if(before.isNaN){
+          throw new Exception("All NAs！")
+        }else{
+          result(i) = before
+        }
+      } // 如果末位为NaN则以最后一个非NaN值填充
+      if(before.isNaN){
+        result(rangeStart - 1) = result(i)
+      }
+
+      val after =  result(i)
+      if (i != rangeStart && !before.isNaN) {
         val increment = (after - before) / (i - (rangeStart - 1))
-        for (j <- rangeStart until i) {
+        for (j <- rangeStart to i) {
           result(j) = result(j - 1) + increment
         }
       }
@@ -215,7 +218,7 @@ object ColNAFill {
     new BDV[Double](result)
   }
 
-  def fillSpline(values: Array[Double]): Array[Double] = {
+  private def fillSpline(values: Array[Double]): Array[Double] = {
     fillSpline(new BDV[Double](values)).toArray
   }
 
@@ -224,7 +227,7 @@ object ColNAFill {
     * @param values Vector to interpolate
     * @return Interpolated vector
     */
-  def fillSpline(values: BV[Double]): BDV[Double] = {
+  private def fillSpline(values: BV[Double]): BDV[Double] = {
     val result = values.copy.toArray
     val interp = new SplineInterpolator()
     val knotsAndValues = values.toArray.zipWithIndex.filter(!_._1.isNaN)
@@ -245,8 +248,6 @@ object ColNAFill {
     }
     new BDV[Double](result)
   }
-
-
 
 
 }
