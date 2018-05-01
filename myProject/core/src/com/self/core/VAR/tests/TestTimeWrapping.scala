@@ -1,7 +1,9 @@
-package com.self.core.VAR.VAR2.tests
+package com.self.core.VAR.tests
 
 import java.text.SimpleDateFormat
+
 import breeze.linalg.DenseMatrix
+import com.self.core.baseApp.myAPP
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.{col, lit, max, unix_timestamp}
 import org.apache.spark.sql.{DataFrame, Row}
@@ -12,9 +14,8 @@ import scala.collection.mutable.ArrayBuffer
 /**
   * 测试时间序列规整算子
   */
-import com.zzjz.deepinsight.basic.BaseMain
 
-object TestTimeWrapping extends BaseMain{
+object TestTimeWrapping extends myAPP{
   def test(): RDD[(String, DenseMatrix[Double])] = {
     /**
       * 模拟数据
@@ -275,7 +276,7 @@ object TestTimeWrapping extends BaseMain{
       .map(roundTime => (roundTime, (Long.MaxValue, Array.fill(K)(Double.NaN)))).toMap
 
 
-    import com.zzjz.deepinsight.core.TimeSeries.VAR.models.MatrixNAFillImplicit._
+    import com.self.core.VAR.models.MatrixNAFillImplicit._
     val u = rawRdd.groupByKey().mapValues(iter => {
       var buffer = zeroValue
       val iterator = iter.toIterator

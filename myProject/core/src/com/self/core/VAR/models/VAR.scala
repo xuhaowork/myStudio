@@ -1,15 +1,9 @@
-package com.self.core.VAR
+package com.self.core.VAR.models
 
-
-import breeze.linalg.operators.OpSet
 import breeze.linalg.{inv, DenseMatrix => BDM}
-import breeze.storage.Zero
-
 import scala.collection.mutable.ArrayBuffer
-import scala.reflect.ClassTag
 
-
-class VAR(val P: Int, val pSteps: Int) extends Serializable {
+class VAR(val P: Int) extends Serializable {
   def run(ts: BDM[Double]): VARModel = {
     val K = ts.cols
     val P = this.P
@@ -44,7 +38,7 @@ class VAR(val P: Int, val pSteps: Int) extends Serializable {
       arr
     }) /* 先形成协防差的滞后阶数，然后将gamma(滞后阶数)每列拼起来，形成一个长列作为协防差阵的data */
 
-    val L_xx: BDM[Double] = util.Try(new BDM(K * P, K * P, sigma)) getOrElse BDM.ones[Double](K * P, K * P)
+    val L_xx: BDM[Double] = new BDM(K * P, K * P, sigma)
 
     /**
       * 求yule-walker方程的自变量因变量的相关矩阵, 即L_xy, (K * P) * K维
@@ -56,7 +50,8 @@ class VAR(val P: Int, val pSteps: Int) extends Serializable {
     /**
       * 求解方程得到混合系数矩阵, ((K * P)* K维)
       */
-    val multiCoefficient = inv(L_xx) * L_xy
+
+    val multiCoefficient = safeInv(L_xx, 0.01) * L_xy
 
     /**
       * 将混合系数矩阵拆为Array[A1, A2, A3, A4, ..., Ap]
@@ -67,8 +62,19 @@ class VAR(val P: Int, val pSteps: Int) extends Serializable {
       new BDM(K, K, data)
     })
 
-    new VARModel(K, P, coefficient)
+    new VARModel(ts, K, P, coefficient)
   }
+
+
+  def safeInv(bm: BDM[Double], alpha: Double = 0.0): BDM[Double] = util.Try(
+    inv(bm)).getOrElse(try{
+    inv(bm + (BDM.ones[Double](bm.rows, bm.cols) :* alpha))
+  }catch{
+    case _: Exception => throw new Exception("模型再加入正则项后仍无法识别，请检查您输入的数据是否存在以下情况：" +
+      "1）数据数目少于变量数和滞后数的乘积；2）数据严重多重共线性问题，请检查是否有几列数据相同或者多列间可以相互线性表示。")
+  })
+
+
 
   /**
     * 求y_t(y_0_t, y_1_t, ..., y_k-1_t)滞后n阶的协方差阵，其中第(i, j)个元素为sum_t [y_i_t, y_j_t]
@@ -96,11 +102,8 @@ class VAR(val P: Int, val pSteps: Int) extends Serializable {
 
 }
 
-class VARModel(val K: Int, val P: Int, val coefficient: Array[BDM[Double]]) extends Serializable {
-  //  /**
-  //    * T * K 和 K * K => T * K
-  //    */
-  def fit(rawData: BDM[Double]): BDM[Double] = {
+class VARModel(val rawData: BDM[Double], val K: Int, val P: Int, val coefficient: Array[BDM[Double]]) extends Serializable {
+  def fit: BDM[Double] = {
     var i = 0
     val buffer = ArrayBuffer.empty[BDM[Double]]
     while(i < rawData.rows - P) {
@@ -117,12 +120,12 @@ class VARModel(val K: Int, val P: Int, val coefficient: Array[BDM[Double]]) exte
     BDM.vertcat(buffer:_*)
   }
 
-  def markov(firstP: BDM[Double], pSteps: Int)
-  : BDM[Double] = {
-    var bv = firstP
-    require(firstP.rows >= coefficient.length, "markov过程需要输入的时间数不能少于模型要求的滞后阶数")
-    require(firstP.cols == coefficient.head.rows && coefficient.head.rows == K, "模型系数以及输入的数据纬度和K需要一致")
-    var bvLength = firstP.rows
+
+  def predict(pSteps: Int): BDM[Double] = {
+    var bv = rawData
+    require(rawData.rows >= coefficient.length, "markov过程需要输入的时间数不能少于模型要求的滞后阶数")
+    require(rawData.cols == coefficient.head.rows && coefficient.head.rows == K, "模型系数以及输入的数据纬度和K需要一致")
+    var bvLength = rawData.rows
 
     var i = 0
     while (i < pSteps) {

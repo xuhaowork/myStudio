@@ -1,4 +1,4 @@
-package com.self.core.VAR.VAR2.models
+package com.self.core.VAR.models
 
 import breeze.linalg.{DenseMatrix => BDM, DenseVector => BDV, Vector => BV}
 import org.apache.commons.math3.analysis.interpolation.SplineInterpolator

@@ -1,4 +1,4 @@
-package com.self.core.VAR
+package com.self.core.VAR.models
 
 import breeze.linalg.{DenseMatrix => BDM}
 
