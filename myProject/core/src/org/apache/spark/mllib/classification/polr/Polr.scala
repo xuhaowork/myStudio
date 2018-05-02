@@ -12,7 +12,7 @@ class Polr(levels: Int,
                          miniBatchFraction: Double) extends Serializable {
   def this() = this(4, 200, 0.3, 0.3)
 
-  def run(input: RDD[(String, LabeledPoint)]) = {
+  def run(input: RDD[(String, LabeledPoint)]): RDD[(String, (LabeledPoint, String))] = {
     /**
       * 特征转化
       */
@@ -20,7 +20,7 @@ class Polr(levels: Int,
     val logitModel = new LogisticRegressionWithSGD(stepSize,
       numIterations, 0.0, miniBatchFraction)
       .setIntercept(true).run(transformRdd.values)
-    import VectorImplicit.VectorLastmplicit
+    import VectorImplicit.VectorLastImplicit
     val interceptLst = logitModel.intercept +: logitModel.weights.last(levels - 2)
 
     println(logitModel.intercept)

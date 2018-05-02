@@ -37,7 +37,7 @@ object VectorImplicit extends Serializable {
 
   }
 
-  implicit class VectorLastmplicit(val values: Vector) {
+  implicit class VectorLastImplicit(val values: Vector) {
     def last(num: Int): Array[Double] = values match {
       case v1: DenseVector =>
         v1.values.takeRight(num)

@@ -25,6 +25,9 @@ object TestPolr extends myAPP{
     val rdd: RDD[(String, LabeledPoint)] = sc.parallelize(lst).map{
       case (key, arr, label) => (key, new LabeledPoint(label, new DenseVector(arr)))
     }
+
+    rdd.foreach(println)
+
     val result = new Polr().run(rdd)
     result.foreach(println)
 

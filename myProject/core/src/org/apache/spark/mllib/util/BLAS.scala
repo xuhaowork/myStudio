@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.utils
+package org.apache.spark.mllib.util
 
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector}
 import org.apache.spark.mllib.linalg.BLAS.dot
