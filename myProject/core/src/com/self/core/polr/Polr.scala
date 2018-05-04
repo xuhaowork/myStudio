@@ -1,61 +1,63 @@
 package com.self.core.polr
 
+import com.google.gson.{Gson, JsonParser}
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
+import org.apache.spark.sql.types.{StringType, StructField}
 import org.apache.spark.sql.{DataFrame, Row}
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-object TestPolr extends BaseMain{
-  def simulate() = {
-    val testData = TestData.testDataMeetingPoint
-    val lst = testData.toMatrixArrayByRow(500, 3)
-
-    val rdd = sc.parallelize(lst).map(Row.fromSeq(_))
-    val rawDataDF = sqlc.createDataFrame(rdd, StructType(Array(StructField("x1", DoubleType),
-      StructField("x2", DoubleType), StructField("y", StringType))))
-
-    outputrdd.put("rawDataDF", rawDataDF)
-  }
-  simulate()
-
-
+/**
+  * 有序回归
+  */
+object Polr extends BaseMain {
   override def run(): Unit = {
     /**
       * 一些参数的处理
       */
-    /** 0)获取基本的系统变量 */
-//    val jsonparam = "<#zzjzParam#>"
-//    val gson = new Gson()
-//    val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
-//    val parser = new JsonParser()
-//    val pJsonParser = parser.parse(jsonparam).getAsJsonObject
-//    val z1 = z
-//    val rddTableName = "<#zzjzRddName#>"
 
-    val rawDataDF = outputrdd.get("rawDataDF").asInstanceOf[DataFrame]
-    rawDataDF.show()
+    /** 0)获取基本的系统变量 */
+    val jsonparam = "<#zzjzParam#>"
+    val gson = new Gson()
+    val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
+    val parser = new JsonParser()
+    val pJsonParser = parser.parse(jsonparam).getAsJsonObject
+    val z1 = z
+    val rddTableName = "<#zzjzRddName#>"
+
+    /** 1)获取DataFrame */
+    val tableName = p.get("inputTableName").trim
+    val rawDataDF = z1.rdd(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
 
     /** 2)因变量列名 */
-    val (idColName: String, idColType: String) = ("y", "string")
+    val (idColName: String, idColType: String) = (pJsonParser.getAsJsonArray("idColName").get(0).getAsJsonObject.get("name").getAsString,
+      pJsonParser.getAsJsonArray("idColName").get(0).getAsJsonObject.get("datatype").getAsString)
 
     /** 3)获取分级信息 */
-    val gradeFormat = "byScheduler" // categories
+    val gradeInfoObj = pJsonParser.getAsJsonObject("gradeInfoObj")
+    val gradeFormat = gradeInfoObj.get("value").getAsString // byScheduler  categories
 
 
     /** 4)获取特征列 */
-    val featureCols: ArrayBuffer[(String, String)] = ArrayBuffer(("x1", "double"), ("x2", "double"))
-
+    val featureColsObj = pJsonParser.getAsJsonArray("featureColsObj")
+    val featureCols: ArrayBuffer[(String, String)] = ArrayBuffer.empty[(String, String)]
+    for (i <- 0 until featureColsObj.size()) {
+      val tup = (featureColsObj.get(i).getAsJsonObject.get("name").getAsString,
+        featureColsObj.get(i).getAsJsonObject.get("datatype").getAsString)
+      featureCols += tup
+    }
 
     // 确认特征列名均存在
     require((featureCols.map(_._1) :+ idColName).forall(s => rawDataDF.schema.fieldNames contains s), "您输入的列名信息有部分不存在")
 
+
     val (trainData: RDD[LabeledPoint], categories) = gradeFormat match {
       case "byScheduler" =>
-        val scheduler = "meetingPoint" // test1 --meetingPoint
+        val schedulerObj = gradeInfoObj.get("scheduler").getAsJsonObject
+        val scheduler = schedulerObj.get("value").getAsString
         scheduler match {
           case "byNumber" =>
             val rdd: RDD[(Double, DenseVector)] = Utils.getRddIdByDouble(rawDataDF: DataFrame,
@@ -116,13 +118,12 @@ object TestPolr extends BaseMain{
 
       case "byHand" =>
         var categories: mutable.Map[String, Double] = scala.collection.mutable.Map.empty
-//        val categoryArray = gradeInfoObj.get("category").getAsJsonArray
-//        for (i <- 0 until categoryArray.size()) {
-//          val tup = (categoryArray.get(i).getAsJsonObject.get("categoryValue").getAsString.trim,
-//            i.toDouble)
-//          categories += tup
-//        }
-
+        val categoryArray = gradeInfoObj.get("category").getAsJsonArray
+        for (i <- 0 until categoryArray.size()) {
+          val tup = (categoryArray.get(i).getAsJsonObject.get("categoryValue").getAsString.trim,
+            i.toDouble)
+          categories += tup
+        }
         val rdd: RDD[(String, DenseVector)] = Utils.getRddIdByString(rawDataDF: DataFrame,
           idColName: String,
           idColType: String,
@@ -137,6 +138,7 @@ object TestPolr extends BaseMain{
 
     val resultModel = new Polr(categories.size, 20000, 0.5, 1.0).run(trainData)
 
+
     val categoriesArray = categories.toArray.sortBy(_._2).map(_._1.toString)
 
     val printArray = categories.toArray.sortBy(_._2).map(_._1).sliding(2).map(_.mkString(" | ")).toArray
@@ -144,6 +146,8 @@ object TestPolr extends BaseMain{
     println()
     println("Intercepts:")
     println(printArray.zip(resultModel.intercepts).map(s => s._1 + "    " + s._2).mkString(", \r\n"))
+
+
 
 
     val resultModelBC = rawDataDF.sqlContext.sparkContext.broadcast(resultModel).value
@@ -157,9 +161,16 @@ object TestPolr extends BaseMain{
     val newDataDF = rawDataDF.sqlContext.createDataFrame(
       newRdd.map(x => Row.fromSeq(x)), StructType(featureSchema :+ StructField(idColName, StringType)
         :+ StructField(idColName + "_fit", StringType)))
+
+    /** output */
     newDataDF.show()
+    newDataDF.registerTempTable(rddTableName)
+    newDataDF.sqlContext.cacheTable(rddTableName)
+    outputrdd.put("<#zzjzRddName#>", newDataDF)
+
 
 
 
   }
+
 }
