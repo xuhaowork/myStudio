@@ -515,7 +515,6 @@ object TestData {
       require(values.lengthCompare(rows * cols) == 0)
       Array.range(0, rows).map(row => values.slice(row * cols, (row + 1) * cols))
     }
-
   }
 
 }

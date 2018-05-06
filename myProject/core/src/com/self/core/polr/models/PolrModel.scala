@@ -19,8 +19,8 @@ class PolrModel(val intercepts: Array[Double],
                     intercepts: Array[Double]): String = {
     require(ataMatrix.size == weightMatrix.size, "您输入的特征长度和系数不同")
     val probabilities = intercepts.map{case value => {
-      val margin = value - VectorBLAS.dot(ataMatrix, weightMatrix)
-      1.0 / (1.0 + math.exp(-margin))
+      val margin = value - dot(ataMatrix, weightMatrix)
+      1.0 / (1.0 + scala.math.exp(-margin))
     }}
     val probabilitiesStart = 0.0 +: probabilities
     val probabilitiesEnd = probabilities :+ 1.0

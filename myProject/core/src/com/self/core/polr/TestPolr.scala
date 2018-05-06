@@ -1,5 +1,7 @@
 package com.self.core.polr
 
+import com.self.core.baseApp.myAPP
+import com.self.core.polr.models.{Polr, TestData, Utils}
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
@@ -9,18 +11,16 @@ import org.apache.spark.sql.{DataFrame, Row}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-object TestPolr extends BaseMain{
+object TestPolr extends myAPP{
   def simulate() = {
     val testData = TestData.testDataMeetingPoint
+    import TestData.ArrayToMatrix
     val lst = testData.toMatrixArrayByRow(500, 3)
 
     val rdd = sc.parallelize(lst).map(Row.fromSeq(_))
-    val rawDataDF = sqlc.createDataFrame(rdd, StructType(Array(StructField("x1", DoubleType),
+    sqlc.createDataFrame(rdd, StructType(Array(StructField("x1", DoubleType),
       StructField("x2", DoubleType), StructField("y", StringType))))
-
-    outputrdd.put("rawDataDF", rawDataDF)
   }
-  simulate()
 
 
   override def run(): Unit = {
@@ -36,8 +36,7 @@ object TestPolr extends BaseMain{
 //    val z1 = z
 //    val rddTableName = "<#zzjzRddName#>"
 
-    val rawDataDF = outputrdd.get("rawDataDF").asInstanceOf[DataFrame]
-    rawDataDF.show()
+    val rawDataDF: DataFrame = simulate()
 
     /** 2)因变量列名 */
     val (idColName: String, idColType: String) = ("y", "string")
