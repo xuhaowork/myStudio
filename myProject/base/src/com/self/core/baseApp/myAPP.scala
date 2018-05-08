@@ -1,5 +1,7 @@
 package com.self.core.baseApp
 
+import java.util.HashMap
+
 import org.apache.spark.sql.SQLContext
 import org.apache.spark.streaming.{Seconds, StreamingContext}
 import org.apache.spark.{SparkConf, SparkContext}
@@ -12,6 +14,7 @@ abstract class myAPP {
   lazy val sc = new SparkContext(conf)
   lazy val sqlc = new SQLContext(sc)
   lazy  val smc : StreamingContext = new StreamingContext(conf, Seconds(1))
+  lazy val memoryMap: java.util.Map[java.lang.String,java.lang.Object] = new HashMap[java.lang.String, java.lang.Object]()
 
   def run(): Unit
   def main(args: Array[String]): Unit = {

@@ -1,7 +1,10 @@
 package com.self.core.syntax
 
+import java.text.SimpleDateFormat
+
 import com.self.core.baseApp.myAPP
 import org.apache.spark.deploy.master.Master
+import org.joda.time.DateTime
 
 object learningObject extends myAPP with Serializable {
   override def run: Unit = {
@@ -125,38 +128,62 @@ object learningObject extends myAPP with Serializable {
 
 
 
-    val arr3: Array[Array[Array[String]]] = Array(
-      Array(
-        Array("A", "B", "C", "D"),
-        Array("E", "F", "G", "H"),
-        Array("I", "J", "K", "L")
-      ),
-      Array(
-        Array("M", "N", "O", "P"),
-        Array("Q", "I", "S", "T"),
-        Array("U", "V", "W", "X"),
-        Array("Y", "Z", "1", "2")
-      ),
-      Array(
-        Array("3", "4", "5", "6"),
-        Array("7", "8", "9", "0")
-      )
-    )
+//    val arr3: Array[Array[Array[String]]] = Array(
+//      Array(
+//        Array("A", "B", "C", "D"),
+//        Array("E", "F", "G", "H"),
+//        Array("I", "J", "K", "L")
+//      ),
+//      Array(
+//        Array("M", "N", "O", "P"),
+//        Array("Q", "I", "S", "T"),
+//        Array("U", "V", "W", "X"),
+//        Array("Y", "Z", "1", "2")
+//      ),
+//      Array(
+//        Array("3", "4", "5", "6"),
+//        Array("7", "8", "9", "0")
+//      )
+//    )
+//
+//    val flattenArr: Array[Array[String]] = arr3.flatten
+//    println(flattenArr.length)
+//    flattenArr.foreach(x => println(x.mkString(",")))
+//
+//
+//    Array.tabulate(2, 3)((j, k) => j * k).foreach(v => println(v.mkString(",")))
+//
+//    val u = Array.tabulate(2, 3)((j, k) => j * k).flatMap(arr => arr.map(_ => Array.range(0, 7)))
+//
+//    u.foreach(v => println(v.mkString(",")))
+//
+//    val u2 = Array.tabulate(2, 3)((j, k) => j * k).map(arr => arr.map(_ => Array.range(0, 7))).flatten
+//
+//    u2.foreach(v => println(v.mkString(",")))
 
-    val flattenArr: Array[Array[String]] = arr3.flatten
-    println(flattenArr.length)
-    flattenArr.foreach(x => println(x.mkString(",")))
 
 
-    Array.tabulate(2, 3)((j, k) => j * k).foreach(v => println(v.mkString(",")))
+    val timeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+    val timeStamp = timeFormat.parse("2017-12-10 00:00:00").getTime
+    val dateTime = new DateTime(timeStamp)
+//
+//    println(dateTime)
+//    val floorTime = dateTime.monthOfYear().roundFloorCopy()
+//    println(floorTime.toString("yyyy-MM-dd HH:mm:ss"))
+//    println(new DateTime(dateTime.getMillis - floorTime.getMillis).hourOfDay().roundHalfFloorCopy().toString("yyyy-MM-dd HH:mm:ss"))
+//
+//    println(new DateTime(dateTime.getMillis - floorTime.getMillis).dayOfYear().roundHalfFloorCopy().toString("yyyy-MM-dd HH:mm:ss"))
 
-    val u = Array.tabulate(2, 3)((j, k) => j * k).flatMap(arr => arr.map(_ => Array.range(0, 7)))
 
-    u.foreach(v => println(v.mkString(",")))
 
-    val u2 = Array.tabulate(2, 3)((j, k) => j * k).map(arr => arr.map(_ => Array.range(0, 7))).flatten
 
-    u2.foreach(v => println(v.mkString(",")))
+    println(dateTime.hourOfDay().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
+
+    println(dateTime.dayOfYear().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
+
+    println(dateTime.dayOfMonth().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
+
+
 
   }
 
