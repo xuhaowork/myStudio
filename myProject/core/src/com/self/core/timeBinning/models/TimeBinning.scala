@@ -8,6 +8,7 @@ import org.apache.spark.sql.functions.{col, unix_timestamp}
 import org.apache.spark.sql.types.LongType
 import org.apache.spark.sql.{DataFrame, UserDefinedFunction}
 import org.joda.time.DateTime
+import scala.math
 
 /**
   *
