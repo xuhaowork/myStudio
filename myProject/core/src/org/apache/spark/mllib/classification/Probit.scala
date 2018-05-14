@@ -10,6 +10,9 @@ import org.apache.spark.mllib.optimization.Gradient
 import org.apache.spark.mllib.util.MLUtils
 import breeze.stats.distributions.Gaussian
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
+import org.apache.spark.mllib.classification.LogisticRegressionWithSGD
+
+
 
 class ProbitGradient(numClasses: Int) extends Gradient {
   require(numClasses == 2, "目前只支持二分类")
