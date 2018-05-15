@@ -183,6 +183,9 @@ object learningObject extends myAPP with Serializable {
 
     println(dateTime.dayOfMonth().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
 
+    val at = new A
+
+    println(at.a(1, 2))
 
 
   }

@@ -46,7 +46,7 @@ class ProbitGradient(numClasses: Int) extends Gradient {
     val margin = 1.0 * dot(data, weights)
     val qMargin: Double = q * margin
     val gaussian = new Gaussian(0.0, 1.0)
-    val multiplier = - q * gaussian.unnormalizedPdf(qMargin) / gaussian.cdf(multiplier)
+    val multiplier = - q * gaussian.unnormalizedPdf(qMargin) / gaussian.cdf(qMargin)
 
     axpy(multiplier, data, cumGradient)
 
