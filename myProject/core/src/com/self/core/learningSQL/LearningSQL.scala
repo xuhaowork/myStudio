@@ -4,6 +4,8 @@ import com.self.core.baseApp.myAPP
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.catalyst.trees
+
 
 /**
   * Created by DataShoe on 2018/1/30.
