@@ -1,0 +1,96 @@
+/*
+  * EM算法
+  * ----
+  * 约定 参数封装在类型Theta中
+  * 约定 x是Vector类型，对于监督学习还会有一个Double类型的标签，统一封装在PointData类中
+  * 约定 z的元素类型是T, 最常见的如Double
+  * ----
+  * 为了统一书写规范，方便接口调用，现将EM算法的推到过程书写如下(latex)：
+  * EM算法（下面指的是一般的EM算法，其他的如MCEM，硬制定EM等也可以利用该框架）:
+  * EM算法用于解决
+  * {{{
+  * \l(\theta) = \sum_{i = 1}^{N}\ln(p(x_i;\theta))
+  *   = \sum_{i = 1}^{N}\ln[\sum_{z\in \Psi_i (z)}p(x_i,z;\theta)]
+  * }}}形式的对数似然函数的极大化问题。
+  * 其中{{{\Psi (z,i)}}}表示第i条记录对应的z的样本空间(E步硬指定时样本空间只有唯一元素)
+  * {{{
+  * \l(\theta) = \sum_{i = 1}^{N}\ln(p(x_i;\theta))
+  *   = \sum_{i = 1}^{N}\ln[\sum_{z\in \Psi_i (z)}p(x_i,z;\theta)] \\
+  *   = \sum_{i = 1}^{N}\ln[\sum_{z \in \Psi_i(z)}Q_i(z) \frac{p(x_i, z;\theta)} {Q_i(z)} ] \\
+  *   = \sum_{i = 1}^{N}\ln\{ E_{z \sim  Q_i(z)} \frac {p(x_i, z; \theta)}{Q_i(z)} \} \\
+  * \geqslant \sum_{i = 1}^{N}E_{z \sim Q_i(z)}\{ \ln[ \frac {p(x_i, z; \theta)}{Q_i(z)}] \} \\
+  * $when$ \ \frac {p(x_i, z; \theta)}{Q_i(z)} \  $is a constant in probability measure for all i, the equality holds.
+  * So we can assume that$
+  * \ Q_i(z) \propto  p(x_i, z;\theta),
+  * $ the the $ \ Q_i(z) \ $can be estimated by: $\\
+  * Q_i(z_j) =p(x_i, z_j;\theta)
+  *   =  \frac {p(x_i,z_j;\theta)}{\sum_{z \in \Psi_i(z)}p(x_i, z;\theta)} \ $in which $z_j \in \Psi_i(z) \\
+  * }}}
+  * {{{
+  *   $So, the EM algorithm:$ \\
+  * $1) The E step: $ \\
+  * $for each i estimate $ Q_i(z) \\
+  * Q_i^{(t)}(z) = p(x_i, z; \theta^{(t)}) \ \ $in which$ z \in \Psi_i(z) \\
+  * $2) The M step:$ \\
+  * $maximize the log likelihood function approximated by $Q_i^{(t)}(z) \ $based on $\theta \\
+  * \theta^{(t+1)} := \underset{\theta \in \Theta }{argmax}(J(Q_i^{(t)}, \theta)) \\
+  *  = \underset {\theta \in \Theta}{argmax}\{\sum_i^N[\sum_{z_j \in \Psi_i(z)}(Q_i^{(t)}(z_j)
+  *  \ln \frac{p(x_i,z_j;\theta))}{Q_i^{(t)}(z_j)}]  \}
+  * }}}
+  * Q(z)也可能是关于theta的函数.
+  * ----
+  * E步：
+  * 估计z的后验概率，即Q(z) = p(z | x, theta), 是一个由(z: T, x: PointData, theta: Theta)
+  * 到 prob: Double的映射，对于硬指派概率是1.0
+  * M步：
+  * 最大化基于Q(z)的对数似然函数, 是由(data: RDD[Vector], Qz) 到 theta的映射.
+  */
+
+
+/*
+  * ----
+  * 多项式probit模型
+  * ----
+  * 系数和协方差矩阵通过极大似然方法估计
+  * 对数似然函数的极大化通过EM算法。
+  * 这里对数似然函数为：
+  * {{{
+  *   \l(\theta) \propto -\frac{N}{2}\ln\det(\Omega ) -\frac{1}{2}tr(\Omega^{-1}\sum_{i = 1}^N e_i{e_i}' )
+  * }}}
+  * 此处不是一般形式的对数加和形式的EM似然函数，不过仍能用EM框架求解。
+  * 我们取z = e*e'，并且硬指定z为e*e'的期望：
+  * {{{
+  * Q_i(z|z \in \Psi_i(z)) = Q_i(e_i{e_i}') \ \ $ with z = $e_i{e_i}' $ and $e_i = y_i - X_i\beta \\
+  * $so $ Q_i(z) = Q_i(e_i{e_i}') = Q_i(e_i{e_i}', \beta)\\
+  * }}}硬指定, 另外注意由于z = e = y -X*beta所以M不最大化的beta变量是包含在Q中的。
+  * {{{
+  * $with hard asign: $\Psi_i(z) = E(e_i{e_i}'|X_i, y_i,\theta^{(t)}) =
+  * E(e_i{e_i}'| X_i, y_i, \beta^{(t)}, \Omega^{(t)}) \\
+  * =\sigma_i^{2(t)} + (\mu_i^{(t)} - X_i\beta){(\mu_i^{(t)} - X_i\beta)}' \\
+  * $and $ \sigma_i^{2(t)} = Var(y_i|\beta^{(t)}, \Omega^{(t)}); \ \mu^{(t)} = E(y_i|\beta^{(t)}, \Omega^{(t)})
+  * }}}
+  * 最大化基于Q(z)的对数似然函数J(theta, Q(z)):
+  * {{
+  * 1)\theta^{(t+1)}:= \underset {\theta}{armgx} \{  -\frac{N}{2}\ln\det(\Omega^{(t)} )
+  * -\frac{1}{2}tr(\Omega^{(t)-1}\sum_{i = 1}^N Q_i(e_i{e_i}', \beta) )\} \\
+  * =(\sum_i^N{X_i}'\Omega^{(t)-1}X_i) (\sum_i^N{X_i}'\Omega^{(t)-1}\mu_i^{(t)})          \\
+  * 2)\Omega^{(t + 1)}:= \underset {\Omega}{armgx} \{ -\frac{N}{2}\ln\det(\Omega ) -
+  * \frac{1}{2}tr(\Omega^{-1}\sum_{i = 1}^N e_i{e_i}' ) \}
+  *
+  * 所以
+  * 1）E步为
+  * {{{
+  * $estimate  $ \sigma_i^{2(t)} $ and $ \mu_i^{(t)} \\
+  * }}}
+  * E步用到了Markov-MonteCarlo Gibbs抽样
+  * 2）M步为
+  * {
+  * 1)\theta^{(t+1)}:=(\sum_i^N{X_i}'\Omega^{(t)-1}X_i) (\sum_i^N{X_i}'\Omega^{(t)-1}\mu_i^{(t)})          \\
+  * 2)\Omega^{(t + 1)}:= \underset{\Omega}{armgx} \{ -\frac{N}{2}\ln\det(\Omega ) -
+  * \frac{1}{2}tr(\Omega^{-1}\sum_{i = 1}^N e_i{e_i}' ) \}
+  * }
+  *
+  */
+
+
+
