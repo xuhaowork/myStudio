@@ -266,27 +266,62 @@ object BinaryProbit {
 }
 
 
-class MultinomialProbit() extends Serializable {
-  val eStep: (BDM[Double], PointData, Theta) => Double = (z: BDM[Double], x: PointData, theta: Theta) => 1.0
 
-  def qz(z: BDM[Double], PointData: Theta): Double = {
-    0.0
+
+
+class MultinomialProbit() extends Serializable {
+  val eStep: (BDM[Double], PointData, Theta)
+    => ErrorCov = (z: BDM[Double], x: PointData, theta: Theta) => ErrorCov(new DenseVector(Array.empty[Double]), BDM.eye[Double](0))
+
+  def qz(z: BDM[Double], PointData: Theta): ErrorCov = {
+    ErrorCov(new DenseVector(Array.empty[Double]), BDM.eye[Double](0))
   }
 
-  def mStep(data: RDD[PointData], qz: (BDM[Double], PointData) => Double): Theta = ProbitParam(new DenseVector(Array.empty[Double]), BDM.zeros[Double](0, 0))
+  def mStep(data: RDD[PointData], qz: (BDM[Double], PointData) => ErrorCov)
+  : Theta = {
+    ProbitParam(new DenseVector(Array.empty[Double]), BDM.zeros[Double](0, 0))
+  }
 
   def converge(data: RDD[PointData], theta: Theta, oldTheta: Theta): Boolean = true
 
-  val em = new EMAlgorithm[BDM[Double]](200, eStep, mStep, converge)
+  val em = new EMAlgorithm[BDM[Double], ErrorCov](200, eStep, mStep, converge)
 
-  def run(data: RDD[LabeledPoint]) = {
-    val newData = data.map(labeledPoint => PointWithLabel(labeledPoint.features, labeledPoint.label))
+  def run(data: RDD[LabeledPoint]): Theta = {
+    val newData: RDD[PointData] = data.map(labeledPoint => PointWithLabel(labeledPoint.features, labeledPoint.label))
 
-
+    val initialWeight = ProbitParam(new DenseVector(Array.empty[Double]), BDM.eye[Double](0))
+    em.optimize(newData, initialWeight)
   }
 
 
 }
+
+
+//class MultinomialProbitModel(val theta: Theta) extends Serializable with Saveable with ClassificationModel {
+//  override def save(sc: SparkContext, path: String): Unit = {
+//
+//
+//  }
+//
+//  override protected def formatVersion: String = ""
+//
+//  override def predict(testData: RDD[Vector]): RDD[Double] = {
+//
+//
+//  }
+//
+//
+//  override def predict(testData: Vector): Double = {
+//
+//
+//  }
+//
+//
+//}
+
+
+case class ErrorCov(mu: Vector, sigma: BDM[Double])
+
 
 case class ProbitParam(beta: Vector, sigma: BDM[Double]) extends Theta {
   override def copy: Theta = ProbitParam(beta, sigma)
