@@ -53,7 +53,7 @@ object LearningSQL extends myAPP{
     val binner2Time = udf((s1: Long) => s1 /widthLength * widthLength)
     df.withColumn("binner_", binner2Time(col("binnerStampTime"))).show()
 
-
+    println(sqlc.tableNames().mkString(","))
 
     // method1
 //    val binner2Time = udf((s1: Long) => s1 /widthLength * widthLength)

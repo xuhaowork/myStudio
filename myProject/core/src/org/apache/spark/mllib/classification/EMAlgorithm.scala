@@ -3,7 +3,7 @@ package org.apache.spark.mllib.classification
 import org.apache.spark.Logging
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd.RDD
-
+import breeze.stats.distributions.Uniform
 
 class EMAlgorithm[T, U](
                          val maxIterations: Int,

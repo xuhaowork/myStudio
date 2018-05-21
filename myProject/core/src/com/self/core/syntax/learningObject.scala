@@ -188,6 +188,16 @@ object learningObject extends myAPP with Serializable {
     println(at.a(1, 2))
 
 
+    val a = 1
+    val b= 1.0
+
+    (a, b) match {
+      case (e1: Int, e2: Double) => {
+        println("good")
+      }
+    }
+
+
   }
 
 }
