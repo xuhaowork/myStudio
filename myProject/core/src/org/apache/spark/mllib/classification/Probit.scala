@@ -67,7 +67,7 @@ class ProbitGradient(numClasses: Int) extends Gradient {
         }
 
       case num: Int => {
-        import com.zzjz.deepinsight.core.polr.models.VectorImplicit.{VectorLastImplicit, VectorDropImplicit}
+//        import com.zzjz.deepinsight.core.polr.models.VectorImplicit.{VectorLastImplicit, VectorDropImplicit}
         val halfL = weights.last(num * (num - 1) / 2) // 取出rho
         // 生成下三角矩阵，避免无法识别，需要L11 = 1, L_{j, 1} = 0
         // cholesky分解
