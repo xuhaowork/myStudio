@@ -9,21 +9,20 @@ package org.apache.spark.mllib.classification
   * date: 2018-05-15 10:30:00
   */
 
-import breeze.linalg.{DenseMatrix => BDM, Matrix => BM}
 import breeze.stats.distributions.Gaussian
 import org.apache.spark.SparkContext
 import org.apache.spark.annotation.Since
 import org.apache.spark.mllib.classification.impl.GLMClassificationModel
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.BLAS.{axpy, dot}
-import org.apache.spark.mllib.linalg.{DenseVector, Vector, Vectors}
+import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.mllib.optimization._
 import org.apache.spark.mllib.pmml.PMMLExportable
 import org.apache.spark.mllib.regression.{GeneralizedLinearAlgorithm, GeneralizedLinearModel, LabeledPoint}
 import org.apache.spark.mllib.util.{DataValidators, Saveable}
 import org.apache.spark.rdd.RDD
 
-class BinaryProbitGradient(numClasses: Int) extends Gradient {
+class ProbitGradient(numClasses: Int) extends Gradient {
   require(numClasses == 2, "目前只支持二分类")
 
   def this() = this(2)
@@ -41,45 +40,62 @@ class BinaryProbitGradient(numClasses: Int) extends Gradient {
                        cumGradient: linalg.Vector): Double = {
     val dataSize = data.size
 
-    // (weights.size / dataSize + 1) is number of classes
-    require(weights.size % dataSize == 0 && numClasses == weights.size / dataSize + 1)
+    numClasses match {
+      case 2 =>
+        // (weights.size / dataSize + 1) is number of classes
+        require(weights.size % dataSize == 0 && numClasses == weights.size / dataSize + 1)
 
-    val q = 2 * label - 1.0
-    val margin = dot(data, weights)
-    val qMargin: Double = q * margin
-    val gaussian = new Gaussian(0.0, 1.0)
-    val multiplier = -q * gaussian.unnormalizedPdf(qMargin) / gaussian.cdf(qMargin)
+        val q = 2 * label - 1.0
+        val margin = dot(data, weights)
+        val qMargin: Double = q * margin
+        val gaussian = new Gaussian(0.0, 1.0)
+        val multiplier = -q * gaussian.unnormalizedPdf(qMargin) / gaussian.cdf(qMargin)
 
-    axpy(multiplier, data, cumGradient)
+        axpy(multiplier, data, cumGradient)
 
-    val cdfMargin = gaussian.cdf(margin)
-    if (label > 0) {
-      if (cdfMargin <= 0.0)
-        Double.MinValue
-      else
-        scala.math.log(cdfMargin)
-    } else {
-      if (cdfMargin >= 1.0)
-        Double.MinValue
-      else
-        scala.math.log(1 - cdfMargin)
+        val cdfMargin = gaussian.cdf(margin)
+        if (label > 0) {
+          if (cdfMargin <= 0.0)
+            Double.MinValue
+          else
+            scala.math.log(cdfMargin)
+        } else {
+          if (cdfMargin >= 1.0)
+            Double.MinValue
+          else
+            scala.math.log(1 - cdfMargin)
+        }
+
+      case num: Int => {
+        import com.zzjz.deepinsight.core.polr.models.VectorImplicit.{VectorLastImplicit, VectorDropImplicit}
+        val halfL = weights.last(num * (num - 1) / 2) // 取出rho
+        // 生成下三角矩阵，避免无法识别，需要L11 = 1, L_{j, 1} = 0
+        // cholesky分解
+        // 通过MCMC求近似似然
+        // 数值求导
+
+
+      }
+
+
     }
+
 
   }
 }
 
 
-class BinaryProbitRegressionWithSGD private[mllib](
-                                                    private var stepSize: Double,
-                                                    private var numIterations: Int,
-                                                    private var regParam: Double,
-                                                    private var miniBatchFraction: Double)
-  extends GeneralizedLinearAlgorithm[BinaryProbitRegressionModel] with Serializable {
+class ProbitRegressionWithSGD private[mllib](
+                                              private var stepSize: Double,
+                                              private var numIterations: Int,
+                                              private var regParam: Double,
+                                              private var miniBatchFraction: Double)
+  extends GeneralizedLinearAlgorithm[ProbitRegressionModel] with Serializable {
 
   this.setFeatureScaling(true)
 
   override val optimizer: GradientDescent =
-    new GradientDescent(new LogisticGradient, new SquaredL2Updater)
+    new GradientDescent(new ProbitGradient, new SquaredL2Updater)
       .setStepSize(stepSize)
       .setNumIterations(numIterations)
       .setRegParam(regParam)
@@ -95,18 +111,18 @@ class BinaryProbitRegressionWithSGD private[mllib](
     }
   }
 
-  override protected def createModel(weights: Vector, intercept: Double): BinaryProbitRegressionModel = {
-    new BinaryProbitRegressionModel(weights, intercept, numFeatures, numOfLinearPredictor + 1)
+  override protected def createModel(weights: Vector, intercept: Double): ProbitRegressionModel = {
+    new ProbitRegressionModel(weights, intercept, numFeatures, numOfLinearPredictor + 1)
   }
 }
 
 
-class BinaryProbitRegressionWithLBFGS extends GeneralizedLinearAlgorithm[BinaryProbitRegressionModel]
+class ProbitRegressionWithLBFGS extends GeneralizedLinearAlgorithm[ProbitRegressionModel]
   with Serializable {
 
   this.setFeatureScaling(true)
 
-  override val optimizer = new LBFGS(new LogisticGradient, new SquaredL2Updater)
+  override val optimizer = new LBFGS(new ProbitGradient, new SquaredL2Updater)
 
   override protected val validators = List(multiLabelValidator)
 
@@ -119,17 +135,17 @@ class BinaryProbitRegressionWithLBFGS extends GeneralizedLinearAlgorithm[BinaryP
   }
 
   override protected def createModel(weights: Vector, intercept: Double)
-  : BinaryProbitRegressionModel = {
-    new BinaryProbitRegressionModel(weights, intercept, numFeatures, numOfLinearPredictor + 1)
+  : ProbitRegressionModel = {
+    new ProbitRegressionModel(weights, intercept, numFeatures, numOfLinearPredictor + 1)
   }
 }
 
 
-class BinaryProbitRegressionModel(
-                                   override val weights: Vector,
-                                   override val intercept: Double,
-                                   val numFeatures: Int,
-                                   val numClasses: Int)
+class ProbitRegressionModel(
+                             override val weights: Vector,
+                             override val intercept: Double,
+                             val numFeatures: Int,
+                             val numClasses: Int)
   extends GeneralizedLinearModel(weights, intercept) with ClassificationModel with Serializable
     with Saveable with PMMLExportable {
 
@@ -190,7 +206,7 @@ class BinaryProbitRegressionModel(
   }
 }
 
-object BinaryProbit {
+object Probit {
   /**
     *
     * @param input             输入的数据
@@ -207,8 +223,8 @@ object BinaryProbit {
                     stepSize: Double,
                     miniBatchFraction: Double,
                     initialWeights: Vector,
-                    addIntercept: Boolean): BinaryProbitRegressionModel = {
-    new BinaryProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction)
+                    addIntercept: Boolean): ProbitRegressionModel = {
+    new ProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction)
       .setIntercept(addIntercept)
       .run(input, initialWeights)
   }
@@ -227,8 +243,8 @@ object BinaryProbit {
                     numIterations: Int,
                     stepSize: Double,
                     miniBatchFraction: Double,
-                    intercept: Boolean): BinaryProbitRegressionModel = {
-    new BinaryProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction)
+                    intercept: Boolean): ProbitRegressionModel = {
+    new ProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction)
       .setIntercept(intercept)
       .run(input)
   }
@@ -237,96 +253,33 @@ object BinaryProbit {
   def trainWithSGD(
                     input: RDD[LabeledPoint],
                     numIterations: Int,
-                    stepSize: Double): BinaryProbitRegressionModel = {
+                    stepSize: Double): ProbitRegressionModel = {
     trainWithSGD(input, numIterations, stepSize, 1.0, true)
   }
 
   def trainWithSGD(
                     input: RDD[LabeledPoint],
                     numIterations: Int
-                  ): BinaryProbitRegressionModel = {
+                  ): ProbitRegressionModel = {
     trainWithSGD(input, numIterations, 1.0)
   }
 
 
   def trainWithLBFGS(input: RDD[LabeledPoint],
-                     addIntercept: Boolean): BinaryProbitRegressionModel = {
-    new BinaryProbitRegressionWithLBFGS()
+                     addIntercept: Boolean): ProbitRegressionModel = {
+    new ProbitRegressionWithLBFGS()
       .setIntercept(addIntercept)
       .run(input)
   }
 
-  def trainWithLBFGS(input: RDD[LabeledPoint]): BinaryProbitRegressionModel = {
-    new BinaryProbitRegressionWithLBFGS()
+  def trainWithLBFGS(input: RDD[LabeledPoint]): ProbitRegressionModel = {
+    new ProbitRegressionWithLBFGS()
       .setIntercept(true)
       .run(input)
   }
 
 
 }
-
-
-
-
-
-class MultinomialProbit() extends Serializable {
-  val eStep: (BDM[Double], PointData, Theta)
-    => ErrorCov = (z: BDM[Double], x: PointData, theta: Theta) => ErrorCov(new DenseVector(Array.empty[Double]), BDM.eye[Double](0))
-
-  def qz(z: BDM[Double], PointData: Theta): ErrorCov = {
-    ErrorCov(new DenseVector(Array.empty[Double]), BDM.eye[Double](0))
-  }
-
-  def mStep(data: RDD[PointData], qz: (BDM[Double], PointData) => ErrorCov)
-  : Theta = {
-    ProbitParam(new DenseVector(Array.empty[Double]), BDM.zeros[Double](0, 0))
-  }
-
-  def converge(data: RDD[PointData], theta: Theta, oldTheta: Theta): Boolean = true
-
-  val em = new EMAlgorithm[BDM[Double], ErrorCov](200, eStep, mStep, converge)
-
-  def run(data: RDD[LabeledPoint]): Theta = {
-    val newData: RDD[PointData] = data.map(labeledPoint => PointWithLabel(labeledPoint.features, labeledPoint.label))
-
-    val initialWeight = ProbitParam(new DenseVector(Array.empty[Double]), BDM.eye[Double](0))
-    em.optimize(newData, initialWeight)
-  }
-
-
-}
-
-
-//class MultinomialProbitModel(val theta: Theta) extends Serializable with Saveable with ClassificationModel {
-//  override def save(sc: SparkContext, path: String): Unit = {
-//
-//
-//  }
-//
-//  override protected def formatVersion: String = ""
-//
-//  override def predict(testData: RDD[Vector]): RDD[Double] = {
-//
-//
-//  }
-//
-//
-//  override def predict(testData: Vector): Double = {
-//
-//
-//  }
-//
-//
-//}
-
-
-case class ErrorCov(mu: Vector, sigma: BDM[Double])
-
-
-case class ProbitParam(beta: Vector, sigma: BDM[Double]) extends Theta {
-  override def copy: Theta = ProbitParam(beta, sigma)
-}
-
 
 
 
