@@ -11,7 +11,7 @@ import org.apache.spark.mllib.stat.MultivariateStatisticalSummary
   */
 object elkKmeans extends myAPP{
   override def run(): Unit = {
-//    import org.apache.spark.clustering.mllib.ElkKmeans
+//    import org.apache.spark.mllib.clustering.mllib.ElkKmeans
 ////    ElkKmeans.printk()
 ////    import org.apache.spark.mllib.linalg.{Vector, Vectors}
 ////    val vs = Vectors.sparse(10, Array(0, 1, 2, 9), Array(9, 5, 2, 7))

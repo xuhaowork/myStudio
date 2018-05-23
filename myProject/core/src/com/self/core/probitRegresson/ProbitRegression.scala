@@ -1,7 +1,7 @@
 package com.self.core.probitRegresson
 
 import com.google.gson.{Gson, JsonParser}
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
 import org.apache.spark.mllib.classification.Probit
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.regression.LabeledPoint
@@ -27,7 +27,7 @@ import scala.collection.mutable.ArrayBuffer
   * date: 2018-05-15 10:30:00
   */
 
-object ProbitRegression extends BaseMain {
+object ProbitRegression extends myAPP {
   override def run(): Unit = {
     /**
       * 一些参数的处理
@@ -36,12 +36,12 @@ object ProbitRegression extends BaseMain {
     val jsonparam = "<#zzjzParam#>"
     val gson = new Gson()
     val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
-    val z1 = z
+    //    val z1 = z
     val rddTableName = "<#zzjzRddName#>"
 
     /** 1)获取DataFrame */
     val tableName = p.get("inputTableName").trim
-    val rawDataDF = z1.rdd(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
+    val rawDataDF = outputrdd.get(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
     val parser = new JsonParser()
     val pJsonParser = parser.parse(jsonparam).getAsJsonObject
 

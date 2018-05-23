@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.mllib.classification
+package org.apache.spark.mllib.classification
 
 /**
   * probit回归的核心运算API
@@ -19,7 +19,7 @@ import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.mllib.optimization._
 import org.apache.spark.mllib.pmml.PMMLExportable
 import org.apache.spark.mllib.regression.{GeneralizedLinearAlgorithm, GeneralizedLinearModel, LabeledPoint}
-import org.apache.spark.mllib.util.ToolsForMNP.getNegativeLogLikelihood
+import org.apache.spark.mllib.util.ToolsForMNP._
 import org.apache.spark.mllib.util.{DataValidators, Saveable}
 import org.apache.spark.rdd.RDD
 
@@ -117,12 +117,16 @@ class ProbitRegressionWithSGD private[mllib](
                                             )
   extends GeneralizedLinearAlgorithm[ProbitRegressionModel] with Serializable {
 
-  def setNumClasses(newNumClasses: Int): this.type = {
-    this.numClasses = newNumClasses
+  def setNumClasses(numClasses: Int): this.type = {
+    require(numClasses > 1, "分类数需要大于1")
+    numOfLinearPredictor = numClasses - 1
+    if (numClasses > 2) {
+      optimizer.setGradient(new LogisticGradient(numClasses))
+    }
     this
   }
 
-  this.setFeatureScaling(true)
+  this.setFeatureScaling(false)
 
   override val optimizer: GradientDescent =
     new GradientDescent(new ProbitGradient(numClasses), new SquaredL2Updater)
@@ -147,12 +151,21 @@ class ProbitRegressionWithLBFGS(private var numClasses: Int) extends Generalized
   with Serializable {
   def this() = this(2)
 
-  def setNumClasses(newNumClasses: Int): this.type = {
-    this.numClasses = newNumClasses
+  //  def setNumClasses(newNumClasses: Int): this.type = {
+  //    this.numClasses = newNumClasses
+  //    this
+  //  }
+
+  def setNumClasses(numClasses: Int): this.type = {
+    require(numClasses > 1)
+    numOfLinearPredictor = numClasses - 1
+    if (numClasses > 2) {
+      optimizer.setGradient(new ProbitGradient(numClasses))
+    }
     this
   }
 
-  this.setFeatureScaling(true)
+  this.setFeatureScaling(false)
 
   override val optimizer = new LBFGS(new ProbitGradient(numClasses), new SquaredL2Updater)
 
@@ -181,11 +194,11 @@ class ProbitRegressionModel(
   extends GeneralizedLinearModel(weights, intercept) with ClassificationModel with Serializable
     with Saveable with PMMLExportable {
 
-//  if (numClasses == 2) {
-//    require(weights.size == numFeatures, "不含截距项的系数长度应该和特征数目一致")
-//  } else {
-//    throw new Exception("暂时没有实现多元probit回归。")
-//  }
+  //  if (numClasses == 2) {
+  //    require(weights.size == numFeatures, "不含截距项的系数长度应该和特征数目一致")
+  //  } else {
+  //    throw new Exception("暂时没有实现多元probit回归。")
+  //  }
 
 
   /**
@@ -221,7 +234,11 @@ class ProbitRegressionModel(
         case None => score
       }
     } else {
-      throw new Exception("暂时没有实现多元probit回归的预测。")
+      Array.range(0, numClasses).map(x => (x,
+        getNegativeLogLikelihood(dataMatrix: linalg.Vector,
+          x.toDouble,
+          weightMatrix: linalg.Vector,
+          numClasses: Int))).minBy(_._2)._1.toDouble
     }
   }
 
@@ -259,7 +276,7 @@ object Probit {
                     addIntercept: Boolean
                   ): ProbitRegressionModel = {
     new ProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction, numClasses: Int)
-      .setIntercept(addIntercept).setFeatureScaling(false)
+      .setIntercept(addIntercept)
       .run(input, initialWeights)
   }
 
@@ -282,31 +299,37 @@ object Probit {
     val featureNums = input.first().features.size
     val rd = new java.util.Random(123L)
     var size = featureNums * numClasses + numClasses * (numClasses - 1) / 2
-    val initialWeights =
-      if (intercept) {
-        size += 1
-        val arr = Array.fill[Double](size)(0.0)
-        for (i <- 0 until numClasses * (numClasses - 1) / 2) {
-          arr(size - 1 - i) = rd.nextDouble()
+    if (numClasses > 2) {
+      val initialWeights =
+        if (intercept) {
+          size += (if (numClasses == 2) 1 else numClasses)
+          val arr = Array.fill[Double](size)(0.0)
+          for (i <- 0 until numClasses * (numClasses - 1) / 2) {
+            arr(size - 1 - i) = rd.nextDouble()
+          }
+          new linalg.DenseVector(arr)
+        } else {
+          val arr = Array.fill[Double](size)(0.0)
+          for (i <- 0 until numClasses * (numClasses - 1) / 2) {
+            arr(size - 1 - i) = rd.nextDouble()
+          }
+          new linalg.DenseVector(arr)
         }
-        new linalg.DenseVector(arr)
-      } else {
-        val arr = Array.fill[Double](size)(0.0)
-        for (i <- 0 until numClasses * (numClasses - 1) / 2) {
-          arr(size - 1 - i) = rd.nextDouble()
-        }
-        new linalg.DenseVector(arr)
-      }
 
-    trainWithSGD(
-      input: RDD[LabeledPoint],
-      numClasses: Int,
-      numIterations: Int,
-      stepSize: Double,
-      miniBatchFraction: Double,
-      initialWeights,
-      intercept
-    )
+      trainWithSGD(
+        input: RDD[LabeledPoint],
+        numClasses: Int,
+        numIterations: Int,
+        stepSize: Double,
+        miniBatchFraction: Double,
+        initialWeights,
+        intercept
+      )
+    } else {
+      new ProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction, numClasses: Int)
+        .setIntercept(false)
+        .run(input)
+    }
   }
 
 

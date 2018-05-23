@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.binary.split;
+package org.apache.spark.binary.split;
 
 import java.io.*;
 import java.lang.reflect.*;

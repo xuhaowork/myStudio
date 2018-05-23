@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.binary.load
+package org.apache.spark.binary.load
 
 import org.apache.hadoop.conf.{Configurable, Configuration}
 import org.apache.hadoop.io.Writable

@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.mllib.util
+package org.apache.spark.mllib.util
 
 import org.apache.spark.mllib.linalg.{BLAS, Vector}
 

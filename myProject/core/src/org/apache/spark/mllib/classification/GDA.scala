@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.mllib.classification
+package org.apache.spark.mllib.classification
 
 import org.apache.spark.Logging
 import org.apache.spark.mllib.regression.LabeledPoint

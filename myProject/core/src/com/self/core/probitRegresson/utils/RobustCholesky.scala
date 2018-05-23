@@ -1,4 +1,4 @@
-package com.self.core.probitRegresson.utils
+package breeze.linalg
 
 import breeze.generic.UFunc
 import breeze.numerics.abs

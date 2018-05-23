@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.binary.load;
+package org.apache.spark.binary.load;
 
 import org.apache.commons.codec.binary.Hex;
 public  final class Conversion {

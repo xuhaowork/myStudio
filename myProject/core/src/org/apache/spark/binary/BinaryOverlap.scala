@@ -1,6 +1,6 @@
-package org.apache.spark.mllib.binary
+package org.apache.spark.binary
 
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileSystem, Path}
 import org.apache.spark.binary.load.{BinaryFiles, Conversion}
@@ -10,7 +10,7 @@ import org.apache.spark.binary.load.{BinaryFiles, Conversion}
   *   date: 2018/1/18
   * */
 
-object BinaryOverlap extends BaseMain{
+object BinaryOverlap extends myAPP{
     override  def  run:Unit={
 
       val path="D:\\binarytest\\baiyuan.txt"

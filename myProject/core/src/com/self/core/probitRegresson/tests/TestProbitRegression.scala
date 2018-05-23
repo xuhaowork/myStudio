@@ -8,6 +8,7 @@ package com.self.core.probitRegresson.tests
   * date: 2018-05-15 10:30:00
   */
 
+import com.self.core.baseApp.myAPP
 import com.zzjz.deepinsight.basic.BaseMain
 import org.apache.spark.mllib.classification.Probit
 import org.apache.spark.mllib.linalg.DenseVector
@@ -19,7 +20,7 @@ import org.apache.spark.sql.{DataFrame, Row}
 
 import scala.collection.mutable.ArrayBuffer
 
-object TestProbitRegression extends BaseMain {
+object TestProbitRegression extends myAPP {
   def generateData(): Unit = {
     val data = TestData.simulate(1000, 123L, new DenseVector(Array(2.5, -0.7)), 7.5)
     val rowRdd = sc.parallelize(data).map(Row.fromSeq(_))

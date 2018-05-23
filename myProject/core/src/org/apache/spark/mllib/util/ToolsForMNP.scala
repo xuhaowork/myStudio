@@ -1,13 +1,13 @@
-package org.apache.spark.mllib.mllib.util
+package org.apache.spark.mllib.util
 
 import java.util.Random
 
-import breeze.linalg.{MatrixEmptyException, MatrixNotSymmetricException, RobustCholesky, cholesky, DenseMatrix => BDM, DenseVector => BDV}
+import breeze.linalg.{MatrixEmptyException, MatrixNotSymmetricException, cholesky, DenseMatrix => BDM, DenseVector => BDV}
 import breeze.stats.distributions.Gaussian
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.BLAS.axpy
 
-object ToolsForMNP {
+object ToolsForMNP extends Serializable {
 
   // 模拟多元正态分布
   def multiNorm(num: Int, rd: Random, mean: BDV[Double], sigma: BDM[Double])
@@ -60,14 +60,14 @@ object ToolsForMNP {
                                num: Int,
                                R: Int = 100): Double = {
     require(weights.size == data.size * num + num * (num - 1) / 2, "参数数目不一致") // weight需要为 num * p + num * (num - 1) / 2维
-    import com.zzjz.deepinsight.core.polr.models.VectorImplicit.VectorLastImplicit
+    import com.self.core.polr.models.VectorImplicit._
     val halfL = (1.0 +: Array.fill[Double](num - 1)(0.0)) ++ weights.last(num * (num - 1) / 2) // 取出rho,避免无法识别，需要L11 = 1, L_{j, 1} = 0
 
     val L: BDM[Double] = new BDV(halfL).toTriangle // 生成下三角矩阵 num * num维
     require(label < num && label >= 0, "label的类型应该标注为0.0至num - 1") // label 应该在0.0到num之间(左闭右开)
 
     val Aq = minusElementaryMatrix(num, label.toInt) // num * num维
-    val P_triangle: BDM[Double] = RobustCholesky(Aq * L * L.t * Aq.t) // 得到Aq对应的协防差阵cholesky变换 num * num维
+    val P_triangle: BDM[Double] = cholesky(Aq * L * L.t * Aq.t) // 得到Aq对应的协防差阵cholesky变换 num * num维
     val R = 100
     val seed = 123L
 
