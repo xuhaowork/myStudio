@@ -38,6 +38,12 @@ object VectorImplicit extends Serializable {
   }
 
   implicit class VectorLastImplicit(val values: Vector) {
+    def first(num: Int): Array[Double] = values match {
+      case v1: DenseVector =>
+        v1.values.take(num)
+      case v1: SparseVector =>
+        v1.indices.take(num).map(v1.values.apply)
+    }
     def last(num: Int): Array[Double] = values match {
       case v1: DenseVector =>
         v1.values.takeRight(num)
@@ -52,6 +58,12 @@ object VectorImplicit extends Serializable {
       case v1: DenseVector => new DenseVector(v1.values.dropRight(num))
       case v1: SparseVector => new SparseVector(
         v1.size - num, v1.indices.dropRight(num), v1.values.dropRight(num))
+    }
+
+    def drop(num: Int): Vector = values match {
+      case v1: DenseVector => new DenseVector(v1.values.drop(num))
+      case v1: SparseVector => new SparseVector(
+        v1.size - num, v1.indices.drop(num), v1.values.drop(num))
     }
   }
 

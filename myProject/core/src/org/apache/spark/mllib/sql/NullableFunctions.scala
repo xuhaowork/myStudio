@@ -1,8 +1,6 @@
 package org.apache.spark.mllib.sql
 
-import org.apache.spark.sql.UserDefinedFunction
 import org.apache.spark.sql.functions.{udf => normalUdf}
-
 import scala.reflect.runtime.universe.TypeTag
 
 /**
@@ -16,6 +14,9 @@ import scala.reflect.runtime.universe.TypeTag
   * 描述：
   * sparkSQL中的udf有以下弊端：
   * 输入可能带有null值，但输出不行，数据会发生信息损失。
+  *    --原因在于Row中null不止代表String的缺失值还作为所有类型的缺失值，（因为column经常出现类型转换，e.g. string转long中
+  *    null值就保留下来，此时long类型的列中就有null值），但一般的scala函数（包括udf）Int/Long/Double等数值型的缺失值却不是null
+  *    ，编译不过。
   * e.g.
   * {{{
   * Long(with null) => Double中不能有null => null的映射：
@@ -25,7 +26,7 @@ import scala.reflect.runtime.universe.TypeTag
   * } // not compile
   * }}}
   * ----
-  * NullableFunctions的udf暗含了的null => null的映射，数据不会损失信息
+  * NullableFunctions的udf将结果封进了Option类，可以实现null => null的映射，数据不会损失信息
   * e.g.
   * {{{
   * NullableFunctions.udf((s: Long) => s / width)
