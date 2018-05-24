@@ -9,7 +9,6 @@ package com.self.core.probitRegresson.tests
   */
 
 import com.self.core.baseApp.myAPP
-import com.zzjz.deepinsight.basic.BaseMain
 import org.apache.spark.mllib.classification.Probit
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.regression.LabeledPoint

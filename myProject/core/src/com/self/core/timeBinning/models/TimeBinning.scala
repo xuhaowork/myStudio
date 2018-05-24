@@ -3,7 +3,7 @@ package com.self.core.timeBinning.models
 import java.sql.Timestamp
 
 import com.self.core.utils.TimeColInfo
-import org.apache.spark.mllib.sql.NullableFunctions
+import org.apache.spark.sql.NullableFunctions
 import org.apache.spark.sql.functions.{col, unix_timestamp}
 import org.apache.spark.sql.types.LongType
 import org.apache.spark.sql.{DataFrame, UserDefinedFunction}

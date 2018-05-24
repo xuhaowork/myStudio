@@ -1,8 +1,9 @@
-package org.apache.spark.mllib.sql.dbPartiiton
+package org.apache.spark.sql.dbPartiiton
 
 import java.sql.ResultSet
+
 import com.google.gson.JsonParser
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.dbPartiiton.partition.Analysis._
 import org.apache.spark.sql.dbPartiiton.partition.Partitioner
@@ -16,7 +17,7 @@ import org.apache.spark.sql.dbPartiiton.jdbc.ToDf
 *    date: 2017.12.28
   * */
 
-object PartitionMain  extends  BaseMain {
+object PartitionMain  extends  myAPP {
 
   override  def  run():Unit={
 

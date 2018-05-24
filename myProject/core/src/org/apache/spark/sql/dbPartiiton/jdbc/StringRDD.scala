@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.sql.dbPartiiton.jdbc
+package org.apache.spark.sql.dbPartiiton.jdbc
 
 /**
   *

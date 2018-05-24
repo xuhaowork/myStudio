@@ -1,5 +1,5 @@
 
-package org.apache.spark.mllib.sql.dbPartiiton.jdbc
+package org.apache.spark.sql.dbPartiiton.jdbc
 
 abstract class NextIterator[U] extends Iterator[U] {
 

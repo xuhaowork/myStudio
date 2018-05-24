@@ -12,7 +12,7 @@ import scala.math
 
 
 /**
-  * editor: xuhao
+  * editor: datashoe
   * date: 2018-02-28 09:00:00
   */
 

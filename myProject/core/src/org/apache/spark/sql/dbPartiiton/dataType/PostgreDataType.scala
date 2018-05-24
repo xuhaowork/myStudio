@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.sql.dbPartiiton.dataType
+package org.apache.spark.sql.dbPartiiton.dataType
 
 class PostgreDataType extends TypeConver {
 

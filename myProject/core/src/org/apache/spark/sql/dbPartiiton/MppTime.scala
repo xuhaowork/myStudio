@@ -1,15 +1,15 @@
-package org.apache.spark.mllib.sql.dbPartiiton
+package org.apache.spark.sql.dbPartiiton
 
 import java.sql.DriverManager
 
 import com.google.gson.Gson
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
 import org.apache.spark.sql.dbPartiiton.partition.Partitioner
 import org.apache.spark.sql.dbPartiiton.service.{ConnectionService, ResConx}
 import org.apache.spark.sql.dbPartiiton.jdbc._
 
 
-object MppTime extends BaseMain{
+object MppTime extends myAPP{
   override def run(): Unit= {
 /*    val jsonparam =
       """{"DBType":"Oracle","ConnType":"Host","Host":"192.168.11.251","Port":"1521","User":"scott","Passw":"zzjzorcl","Sid":"ORCL",

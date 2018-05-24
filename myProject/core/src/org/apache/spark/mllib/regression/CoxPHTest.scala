@@ -5,7 +5,7 @@ import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.rdd.RDD
 
 /**
-  * Created by dell on 2018/4/13.
+  * Created by datashoe on 2018/4/13.
   */
 object CoxPHTest extends myAPP{
   override def run(): Unit = {

@@ -1,7 +1,7 @@
 package com.self.core.polr
 
-import com.zzjz.deepinsight.basic.BaseMain
-import com.zzjz.deepinsight.core.polr.models.{Polr, TestData, Utils}
+import com.self.core.baseApp.myAPP
+import com.self.core.polr.models.{Polr, TestData, Utils}
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
@@ -20,8 +20,8 @@ import scala.collection.mutable.ArrayBuffer
   * 测试有序回归
   */
 
-object TestPolr extends BaseMain {
-  def simulate() = {
+object TestPolr extends myAPP {
+  def simulate(): Unit = {
     val testData = TestData.testDataMeetingPoint
     import TestData.ArrayToMatrix
     val lst = testData.toMatrixArrayByRow(500, 3)

@@ -5,7 +5,7 @@ package org.apache.spark.mllib.classification
   */
 
 /**
-  * editor: xuhao
+  * editor: datashoe
   * date: 2018-05-15 10:30:00
   */
 
@@ -63,7 +63,7 @@ class ProbitGradient(val numClasses: Int, var diff: Double, var smoothSampleTime
         val margin = dot(data, weights)
         val qMargin: Double = q * margin
         val gaussian = new Gaussian(0.0, 1.0)
-        val multiplier = -q * gaussian.unnormalizedPdf(qMargin) / gaussian.cdf(qMargin)
+        val multiplier = q * gaussian.pdf(qMargin) / (gaussian.cdf(qMargin) + 1E-4)
 
         axpy(multiplier, data, cumGradient)
 
@@ -112,28 +112,36 @@ class ProbitRegressionWithSGD private[mllib](
                                               private var stepSize: Double,
                                               private var numIterations: Int,
                                               private var regParam: Double,
-                                              private var miniBatchFraction: Double,
-                                              private var numClasses: Int
+                                              private var miniBatchFraction: Double
                                             )
   extends GeneralizedLinearAlgorithm[ProbitRegressionModel] with Serializable {
 
+  private var numClasses: Int = 2
+
+  this.setFeatureScaling(false)
+
+
   def setNumClasses(numClasses: Int): this.type = {
     require(numClasses > 1, "分类数需要大于1")
+    this.numClasses = numClasses
     numOfLinearPredictor = numClasses - 1
     if (numClasses > 2) {
-      optimizer.setGradient(new LogisticGradient(numClasses))
+      this.numClasses = numClasses
+      optimizer.setGradient(new ProbitGradient(numClasses))
+    } else {
+      this.setFeatureScaling(true)
     }
     this
   }
 
-  this.setFeatureScaling(false)
-
-  override val optimizer: GradientDescent =
+  override val optimizer: GradientDescent = {
+    println("optimizer:", numClasses)
     new GradientDescent(new ProbitGradient(numClasses), new SquaredL2Updater)
       .setStepSize(stepSize)
       .setNumIterations(numIterations)
       .setRegParam(regParam)
       .setMiniBatchFraction(miniBatchFraction)
+  }
 
   override protected val validators = List(multiLabelValidator)
 
@@ -151,16 +159,14 @@ class ProbitRegressionWithLBFGS(private var numClasses: Int) extends Generalized
   with Serializable {
   def this() = this(2)
 
-  //  def setNumClasses(newNumClasses: Int): this.type = {
-  //    this.numClasses = newNumClasses
-  //    this
-  //  }
-
   def setNumClasses(numClasses: Int): this.type = {
     require(numClasses > 1)
+    this.numClasses = numClasses
     numOfLinearPredictor = numClasses - 1
     if (numClasses > 2) {
       optimizer.setGradient(new ProbitGradient(numClasses))
+    } else {
+      this.setFeatureScaling(true)
     }
     this
   }
@@ -193,14 +199,6 @@ class ProbitRegressionModel(
                              val numClasses: Int)
   extends GeneralizedLinearModel(weights, intercept) with ClassificationModel with Serializable
     with Saveable with PMMLExportable {
-
-  //  if (numClasses == 2) {
-  //    require(weights.size == numFeatures, "不含截距项的系数长度应该和特征数目一致")
-  //  } else {
-  //    throw new Exception("暂时没有实现多元probit回归。")
-  //  }
-
-
   /**
     * Constructs a [[LogisticRegressionModel]] with weights and intercept for binary classification.
     */
@@ -275,8 +273,8 @@ object Probit {
                     initialWeights: Vector,
                     addIntercept: Boolean
                   ): ProbitRegressionModel = {
-    new ProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction, numClasses: Int)
-      .setIntercept(addIntercept)
+    new ProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction)
+      .setIntercept(addIntercept).setNumClasses(numClasses)
       .run(input, initialWeights)
   }
 
@@ -326,9 +324,10 @@ object Probit {
         intercept
       )
     } else {
-      new ProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction, numClasses: Int)
-        .setIntercept(false)
-        .run(input)
+      val initialWeights = Vectors.zeros(featureNums)
+      new ProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction)
+        .setIntercept(intercept)
+        .run(input, initialWeights)
     }
   }
 
@@ -357,6 +356,7 @@ object Probit {
                     ): ProbitRegressionModel = {
     new ProbitRegressionWithLBFGS()
       .setIntercept(addIntercept)
+      .setValidateData(false)
       .run(input)
   }
 
@@ -368,6 +368,5 @@ object Probit {
 
 
 }
-
 
 

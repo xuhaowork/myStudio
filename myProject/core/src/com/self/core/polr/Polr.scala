@@ -1,14 +1,15 @@
 package com.self.core.polr
 
 import com.google.gson.{Gson, JsonParser}
-import com.zzjz.deepinsight.basic.BaseMain
-import com.zzjz.deepinsight.core.polr.models.{Polr, Utils}
+import com.self.core.baseApp.myAPP
+import com.self.core.polr.models.{Polr, Utils}
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
 import org.apache.spark.sql.{DataFrame, Row}
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -20,7 +21,7 @@ import scala.collection.mutable.ArrayBuffer
   * date： 2017/5/4 10:00:00
   */
 
-object Polr extends BaseMain {
+object Polr extends myAPP {
   override def run(): Unit = {
     /**
       * 一些参数的处理
@@ -31,12 +32,12 @@ object Polr extends BaseMain {
     val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
     val parser = new JsonParser()
     val pJsonParser = parser.parse(jsonparam).getAsJsonObject
-    val z1 = z
+    val z1 = memoryMap
     val rddTableName = "<#zzjzRddName#>"
 
     /** 1)获取DataFrame */
     val tableName = p.get("inputTableName").trim
-    val rawDataDF = z1.rdd(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
+    val rawDataDF = z1.get(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
 
     /** 2)因变量列名 */
     val (idColName: String, idColType: String) = (pJsonParser.getAsJsonArray("idColName").get(0).getAsJsonObject.get("name").getAsString,

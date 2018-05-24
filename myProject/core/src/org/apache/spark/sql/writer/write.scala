@@ -3,7 +3,7 @@ package org.apache.spark.mllib.sql.writer
 import java.util.Properties
 
 import com.google.gson.JsonParser
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
 import org.apache.spark.sql.dbPartiiton.service.{ConnectionService, ResConx}
 import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.writer.SchemaWriter._
@@ -13,7 +13,7 @@ import org.apache.spark.sql.writer.JdbcUtils._
   * Author:  BaiYuan
   * Date:    2018/1/29
 * */
-object write  extends  BaseMain{
+object write extends myAPP{
   override def run:Unit={
 
    /* //  Gbase8t
@@ -109,17 +109,15 @@ object write  extends  BaseMain{
       val sql = "select " + fieldList + " from " + inputTableName
       df = sqlc.sql(sql)
     } else {
-      df=z.rdd(inputTableName).asInstanceOf[DataFrame]
+      df=memoryMap.get(inputTableName).asInstanceOf[DataFrame]
     }
     // 直接的DF
 
     dbType match {
       case "Hive" =>
-
-      //平台上需要加上这行代码
-       /*if (!sqlc.equals(hqlc)) {
-         df = DataFrameUtil.switchDataFrameContext(df, hqlc)
-       }*/
+//       if (!sqlc.equals(hqlc)) {
+//         df = DataFrameUtil.switchDataFrameContext(df, hqlc)
+//       }
         df.registerTempTable("table1")
         hqlc.sql(s"use $base")
         if(writeMethod=="selectFromDB") {

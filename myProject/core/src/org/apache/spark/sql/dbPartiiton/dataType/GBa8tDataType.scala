@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.sql.dbPartiiton.dataType
+package org.apache.spark.sql.dbPartiiton.dataType
 
 class GBa8tDataType  extends  TypeConver{
   override def conversion(str: String): String = {

@@ -1,8 +1,7 @@
-package org.apache.spark.mllib.sql.regularExpression
+package org.apache.spark.sql.regularExpression
 
 import com.google.gson.JsonParser
-import com.zzjz.deepinsight.basic.BaseMain
-
+import com.self.core.baseApp.myAPP
 import org.apache.spark.sql.{Row, SQLContext}
 import org.apache.spark.sql.types._
 
@@ -10,7 +9,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.util.matching.Regex
 
 //最好就是所有的列都有配置文件给出，或者输入框输入。
-object lineMain extends  BaseMain{
+object lineMain extends  myAPP{
 
   override  def  run():Unit= {
 

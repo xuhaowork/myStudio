@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.mllib.feature
+package org.apache.spark.mllib.feature
 
 import org.apache.spark.mllib.linalg.{DenseMatrix, DenseVector, Matrix, Vector, Vectors}
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
@@ -11,7 +11,7 @@ import scala.math
 
 
 /**
-  * editor: xuhao
+  * editor: datashoe
   * date: 2018-02-10 09:00:00
   */
 

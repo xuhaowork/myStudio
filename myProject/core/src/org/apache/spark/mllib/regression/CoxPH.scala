@@ -6,7 +6,7 @@ import org.apache.spark.mllib.linalg.{SparseVector, Vector, Vectors}
 import org.apache.spark.rdd.RDD
 
 /**
-  * Created by dell on 2018/4/13.
+  * Created by datahoe on 2018/4/13.
   */
 class CoxPH(private var epsilon: Double,
             private var maxIterations: Int,

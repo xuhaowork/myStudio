@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.sql.writer
+package org.apache.spark.sql.writer
 
 import java.sql.{Connection, PreparedStatement, SQLException}
 

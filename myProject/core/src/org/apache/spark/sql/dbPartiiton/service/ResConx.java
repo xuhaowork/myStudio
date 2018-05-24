@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.sql.dbPartiiton.service;
+package org.apache.spark.sql.dbPartiiton.service;
 
 import java.util.HashMap;
 

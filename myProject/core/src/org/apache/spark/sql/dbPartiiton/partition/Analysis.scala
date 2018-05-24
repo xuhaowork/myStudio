@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.sql.dbPartiiton.partition
+package org.apache.spark.sql.dbPartiiton.partition
 
 import com.google.gson.JsonArray
 import scala.collection.mutable.ArrayBuffer

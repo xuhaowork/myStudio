@@ -1,20 +1,20 @@
-package org.apache.spark.mllib.sql.dbPartiiton
+package org.apache.spark.sql.dbPartiiton
 
 import com.google.gson.JsonParser
 import com.mongodb.spark.MongoSpark
 import com.mongodb.spark.config.ReadConfig
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
 import org.apache.spark.sql.DataFrame
 import org.apache.spark.sql.dbPartiiton.partition.Analysis
 import org.bson
 import org.bson.BsonDocument
 
 /**
-  *   author: Bai yuan
+  *   author: data
   *   date:   2018/1/19
 * */
 
-object MongoDB  extends  BaseMain{
+object MongoDB  extends  myAPP{
 
      override  def  run:Unit={
 
