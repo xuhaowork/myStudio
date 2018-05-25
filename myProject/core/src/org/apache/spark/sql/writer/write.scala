@@ -1,4 +1,4 @@
-package org.apache.spark.mllib.sql.writer
+package org.apache.spark.sql.writer
 
 import java.util.Properties
 
@@ -9,10 +9,7 @@ import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.writer.SchemaWriter._
 import org.apache.spark.sql.writer.JdbcUtils._
 
-/**
-  * Author:  BaiYuan
-  * Date:    2018/1/29
-* */
+
 object write extends myAPP{
   override def run:Unit={
 

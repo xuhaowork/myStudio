@@ -163,30 +163,31 @@ object learningObject extends myAPP with Serializable {
 
 
 
-    val timeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
-    val timeStamp = timeFormat.parse("2017-12-10 00:00:00").getTime
-    val dateTime = new DateTime(timeStamp)
+//    val timeFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss")
+//    val timeStamp = timeFormat.parse("2017-12-10 00:00:00").getTime
+//    val dateTime = new DateTime(timeStamp)
+////
+////    println(dateTime)
+////    val floorTime = dateTime.monthOfYear().roundFloorCopy()
+////    println(floorTime.toString("yyyy-MM-dd HH:mm:ss"))
+////    println(new DateTime(dateTime.getMillis - floorTime.getMillis).hourOfDay().roundHalfFloorCopy().toString("yyyy-MM-dd HH:mm:ss"))
+////
+////    println(new DateTime(dateTime.getMillis - floorTime.getMillis).dayOfYear().roundHalfFloorCopy().toString("yyyy-MM-dd HH:mm:ss"))
 //
-//    println(dateTime)
-//    val floorTime = dateTime.monthOfYear().roundFloorCopy()
-//    println(floorTime.toString("yyyy-MM-dd HH:mm:ss"))
-//    println(new DateTime(dateTime.getMillis - floorTime.getMillis).hourOfDay().roundHalfFloorCopy().toString("yyyy-MM-dd HH:mm:ss"))
 //
-//    println(new DateTime(dateTime.getMillis - floorTime.getMillis).dayOfYear().roundHalfFloorCopy().toString("yyyy-MM-dd HH:mm:ss"))
-
-
-
-
-    println(dateTime.hourOfDay().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
-
-    println(dateTime.dayOfYear().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
-
-    println(dateTime.dayOfMonth().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
+//
+//
+//    println(dateTime.hourOfDay().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
+//
+//    println(dateTime.dayOfYear().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
+//
+//    println(dateTime.dayOfMonth().roundHalfCeilingCopy().toString("yyyy-MM-dd HH:mm:ss"))
 
     val at = new A
 
     println(at.a(1, 2))
 
+    println(at.a(1, 2, true))
 
     val a = 1
     val b= 1.0

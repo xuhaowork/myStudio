@@ -3,7 +3,7 @@ package com.self.core.learningSQL
 import com.self.core.baseApp.myAPP
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{StringType, StructField, StructType}
+import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
 import org.apache.spark.sql.catalyst.trees
 
 
@@ -123,7 +123,13 @@ object LearningSQL extends myAPP{
 //    df.withColumn("binner_", binner2Time(col("binnerStampTime"))).show()
 
 
-
+    val lst = Array.fill(100)(1.0)
+    val rdd2 = sc.parallelize(lst).map(Row(_))
+    val newDataFrame = hqlc.createDataFrame(rdd2, StructType(Array(StructField("test", DoubleType))))
+    newDataFrame.cache()
+    outputrdd.put("<#zzjzRddName#>", newDataFrame)
+    newDataFrame.registerTempTable("<#zzjzRddName#>")
+    newDataFrame.sqlContext.cacheTable("<#zzjzRddName#>")
 
 
 
