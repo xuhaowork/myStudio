@@ -1,7 +1,7 @@
 package com.self.core.learningSQL
 
 import com.self.core.baseApp.myAPP
-import org.apache.spark.sql.Row
+import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
 import org.apache.spark.sql.catalyst.trees
@@ -13,48 +13,50 @@ import org.apache.spark.ml.feature._
   */
 object LearningSQL extends myAPP{
   override def run(): Unit = {
-    val arr = List(
-      Array("1", "00:00:00"),
-      Array("1", "01:2:10"),
-      Array("1", "02:2:10"),
-      Array("1", "01:2:10"),
-      Array("1", "3:2:10"),
-      Array("1", "5:2:10"),
-      Array("1", "00:2:10"),
-      Array("1", "01:59:10"),
-      Array("1", null),
-      Array("1", "10:2:32"),
-      Array("1", "23:00:10"),
-      Array("1", "A"))
-
-    val rdd = sc.parallelize(arr).map(Row.fromSeq(_))
-    var df = sqlc.createDataFrame(rdd, StructType(Array(StructField("id", StringType), StructField("dayTime", StringType))))
-
-    df = df.withColumn("gmtStart", lit("1970-01-01"))
-
-    val paste = udf((s1: String, s2: String) => s1 + "," + s2)
-    df = df
-      .withColumn("binnerTime", paste(col("gmtStart"), col("dayTime")))
-      .withColumn("binnerStampTime", unix_timestamp(col("binnerTime"), "yyyy-MM-dd HH:mm:ss").+(28800))
-      .drop("gmtStart")
-      .drop("binnerTime")
-
-    val width = "3"
-    val widthUnit = "h"
-    val widthLength = widthUnit match {
-      case "h" => util.Try(width.toInt).getOrElse(-1)*3600
-      case "m" => util.Try(width.toInt).getOrElse(-1)*60
-      case "s" => util.Try(width.toInt).getOrElse(-1)*1
-    }
-
-    require(widthLength > 0, "您输入的分箱间隔应该为数值，并且需要选择对应分箱单位。")
-
-
-// SparkSQL automatically has null transformation, though it is limited.
-    val binner2Time = udf((s1: Long) => s1 /widthLength * widthLength)
-    df.withColumn("binner_", binner2Time(col("binnerStampTime"))).show()
-
-    println(sqlc.tableNames().mkString(","))
+//    val arr = List(
+//      Array("1", "00:00:00"),
+//      Array("1", "01:2:10"),
+//      Array("1", "02:2:10"),
+//      Array("1", "01:2:10"),
+//      Array("1", "3:2:10"),
+//      Array("1", "5:2:10"),
+//      Array("1", "00:2:10"),
+//      Array("1", "01:59:10"),
+//      Array("1", null),
+//      Array("1", "10:2:32"),
+//      Array("1", "23:00:10"),
+//      Array("1", "A"))
+//
+//    val rdd = sc.parallelize(arr).map(Row.fromSeq(_))
+//    var df: DataFrame = sqlc.createDataFrame(rdd, StructType(Array(StructField("id", StringType), StructField("dayTime", StringType))))
+//
+//    df = df.withColumn("gmtStart", lit("1970-01-01"))
+//
+//    sqlc.cacheTable("a")
+//
+//    val paste = udf((s1: String, s2: String) => s1 + "," + s2)
+//    df = df
+//      .withColumn("binnerTime", paste(col("gmtStart"), col("dayTime")))
+//      .withColumn("binnerStampTime", unix_timestamp(col("binnerTime"), "yyyy-MM-dd HH:mm:ss").+(28800))
+//      .drop("gmtStart")
+//      .drop("binnerTime")
+//
+//    val width = "3"
+//    val widthUnit = "h"
+//    val widthLength = widthUnit match {
+//      case "h" => util.Try(width.toInt).getOrElse(-1)*3600
+//      case "m" => util.Try(width.toInt).getOrElse(-1)*60
+//      case "s" => util.Try(width.toInt).getOrElse(-1)*1
+//    }
+//
+//    require(widthLength > 0, "您输入的分箱间隔应该为数值，并且需要选择对应分箱单位。")
+//
+//
+//// SparkSQL automatically has null transformation, though it is limited.
+//    val binner2Time = udf((s1: Long) => s1 /widthLength * widthLength)
+//    df.withColumn("binner_", binner2Time(col("binnerStampTime"))).show()
+//
+//    println(sqlc.tableNames().mkString(","))
 
     // method1
 //    val binner2Time = udf((s1: Long) => s1 /widthLength * widthLength)
@@ -124,14 +126,15 @@ object LearningSQL extends myAPP{
 //    df.withColumn("binner_", binner2Time(col("binnerStampTime"))).show()
 
 
-    val lst = Array.fill(100)(1.0)
-    val rdd2 = sc.parallelize(lst).map(Row(_))
-    val newDataFrame = hqlc.createDataFrame(rdd2, StructType(Array(StructField("test", DoubleType))))
-    newDataFrame.cache()
-    outputrdd.put("<#zzjzRddName#>", newDataFrame)
-    newDataFrame.registerTempTable("<#zzjzRddName#>")
-    newDataFrame.sqlContext.cacheTable("<#zzjzRddName#>")
+//    val lst = Array.fill(100)(1.0)
+//    val rdd2 = sc.parallelize(lst).map(Row(_))
+//    val newDataFrame = hqlc.createDataFrame(rdd2, StructType(Array(StructField("test", DoubleType))))
+//    newDataFrame.cache()
+//    outputrdd.put("<#zzjzRddName#>", newDataFrame)
+//    newDataFrame.registerTempTable("<#zzjzRddName#>")
+//    newDataFrame.sqlContext.cacheTable("<#zzjzRddName#>")
 
+    println(sqlc.getConf("spark.sql.inMemoryColumnarStorage.compressed"))
 
 
   }
