@@ -1,7 +1,14 @@
 package com.self.core.featureTransform
 
 import breeze.linalg.{DenseVector => BDV}
+import breeze.stats.distributions.Gaussian
 import com.self.core.baseApp.myAPP
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.sql.functions.{col, substring}
+import org.apache.spark.sql.types.DoubleType
+
+import scala.Serializable
 
 object TestFeatures extends myAPP {
   def feature11(): Unit = {
@@ -101,16 +108,159 @@ object TestFeatures extends myAPP {
 
     val remover = new StopWordsRemover()
       .setInputCol("raw")
-      .setOutputCol("filtered").setStopWords(Array("I", "Mary"))
+      .setOutputCol("filtered")
+      .setStopWords(Array("I", "Mary")) // 停用词
 
 
-    val dataSet = sqlc.createDataFrame(Seq(
+    val dataSet: DataFrame = sqlc.createDataFrame(Seq(
       (0, Seq("I", "saw", "the", "red", "baloon")),
       (1, Seq("Mary", "had", "a", "little", "lamb"))
     )).toDF("id", "raw")
 
     remover.transform(dataSet).show()
   }
+
+  def feature16() = {
+    /** n-gram */
+    import org.apache.spark.ml.feature.NGram
+
+    val wordDataFrame = sqlc.createDataFrame(Seq(
+      (0, Array("Hi", "I", "heard", "about", "Spark")),
+      (1, Array("I", "wish", "Java", "could", "use", "case", "classes")),
+      (2, Array("Logistic", "regression", "models", "are", "neat"))
+    )).toDF("label", "words")
+
+    val ngram = new NGram().setInputCol("words").setOutputCol("ngrams").setN(3)
+    val ngramDataFrame = ngram.transform(wordDataFrame)
+    ngramDataFrame.take(3).map(_.getAs[Stream[String]]("ngrams").toList).foreach(println)
+    println(ngramDataFrame.schema.map(_.dataType).mkString(","))
+  }
+
+  def feature17() = {
+    /** 二值化 */
+    import org.apache.spark.ml.feature.Binarizer
+
+    val data = Array((0, "0.1"), (1, "0.8"), (2, null))
+    val dataFrame = sqlc.createDataFrame(data).toDF("label", "feature").select(col("feature").cast(DoubleType))
+    dataFrame.show()
+    val binarizer: Binarizer = new Binarizer()
+      .setInputCol("feature") // 此处必须是Double类型，还需要一加一个转换。null值是可以的
+      .setOutputCol("binarized_feature")
+      .setThreshold(0.5)
+
+    val binarizedDataFrame = binarizer.transform(dataFrame)
+    val binarizedFeatures = binarizedDataFrame.select("binarized_feature")
+    binarizedFeatures.collect().foreach(println)
+  }
+
+  def feature18() = {
+    import org.apache.spark.ml.feature.PCA
+    import org.apache.spark.mllib.linalg.Vectors
+
+    val data = Array(
+      Vectors.sparse(5, Seq((1, 1.0), (3, 7.0))),
+      Vectors.dense(2.0, 0.0, 3.0, 4.0, 5.0),
+      Vectors.dense(4.0, 0.0, 0.0, 6.0, 7.0)
+    )
+    val df = sqlc.createDataFrame(data.map(Tuple1.apply)).toDF("features")
+    val pca = new PCA()
+      .setInputCol("features")
+      .setOutputCol("pcaFeatures")
+      .setK(3)
+      .fit(df)
+    val pcaDF = pca.transform(df)
+    val result = pcaDF.select("pcaFeatures")
+    result.show()
+  }
+
+  def feature19() = {
+    import org.apache.spark.ml.feature.PolynomialExpansion
+    import org.apache.spark.mllib.linalg.Vectors
+
+    val data = Array(
+      Vectors.dense(-2.0, 1.0),
+      Vectors.dense(0.0, 3.0),
+      Vectors.dense(0.0, -3.0),
+      Vectors.dense(1.0, 2.0)
+    )
+    val df = sqlc.createDataFrame(data.map(Tuple1.apply)).toDF("features")
+    val polynomialExpansion = new PolynomialExpansion()
+      .setInputCol("features")
+      .setOutputCol("polyFeatures")
+      .setDegree(3)
+    val polyDF = polynomialExpansion.transform(df)
+    polyDF.select("polyFeatures").take(4).foreach(println)
+
+  }
+
+  def feature20() = {
+    import org.apache.spark.ml.feature.DCT
+    import org.apache.spark.mllib.linalg.Vectors
+
+    val data = Seq(
+      Vectors.dense(0.0, 1.0, -2.0),
+      Vectors.dense(-1.0, 2.0, 4.0, -7.0),
+      Vectors.dense(14.0))
+
+    val df = sqlc.createDataFrame(data.map(Tuple1.apply)).toDF("features")
+
+    val dct = new DCT()
+      .setInputCol("features")
+      .setOutputCol("featuresDCT")
+      .setInverse(false)
+
+    val dctDf = dct.transform(df)
+
+    dctDf.select("featuresDCT").show(3)
+  }
+
+  def feature21() = {
+    import org.apache.spark.ml.feature.StringIndexer
+
+    val df1 = sqlc.createDataFrame(
+      Seq((0, "a"), (1, "b"), (2, "c"), (3, "a"))
+    ).toDF("id", "category")
+
+    val df2 = sqlc.createDataFrame(
+      Seq((0, "a"), (1, "b"), (2, "c"), (3, "a"), (4, "a"), (5, "c"))
+    ).toDF("id", "category")
+
+
+    val indexer = new StringIndexer()
+      .setInputCol("category")
+      .setOutputCol("categoryIndex")
+
+    val indexed = indexer.fit(df1).transform(df2)
+    indexed.show()
+  }
+
+  def feature22() = {
+    import org.apache.spark.ml.feature.{IndexToString, StringIndexer}
+
+    val df = sqlc.createDataFrame(Seq(
+      (0, "a"),
+      (1, "b"),
+      (2, "c"),
+      (3, "a"),
+      (4, "a"),
+      (5, "c")
+    )).toDF("id", "category")
+
+    val indexer = new StringIndexer()
+      .setInputCol("category")
+      .setOutputCol("categoryIndex")
+      .fit(df)
+    val indexed = indexer.transform(df)
+
+    val converter = new IndexToString()
+      .setInputCol("categoryIndex")
+      .setOutputCol("originalCategory")
+
+    val converted = converter.transform(indexed)
+    converted.select("id", "originalCategory").show()
+  }
+
+
 
   override def run(): Unit = {
     /** 1.特征提取 */
@@ -126,8 +276,34 @@ object TestFeatures extends myAPP {
     //    feature14()
 
     /** 1-5 停用词移除 */
-    feature15()
+//    feature15()
 
+    /** 1-6 n-gram */
+//    feature16()
+
+    /** 1-7 二值化 */
+//    feature17()
+
+    /** 1-8 主成分 */
+//    feature18()
+
+    /** 1-9 多项式展开 */
+//    feature19()
+
+    /** 1-10 离散余弦变换 */
+//    feature20()
+
+    /** 1-11 String标签转为数值标签 */
+//    feature21()
+
+    /** 1-12 Double标签转为String标签 */
+//    feature22()
+
+
+val gaussian = new Gaussian(0.0, 1.0)
+
+    println(gaussian.cdf(0.0))
+    println(gaussian.pdf(0.0))
 
     //    import org.apache.spark.ml.feature.DCT
     //    import org.apache.spark.mllib.linalg.{Vectors, Vector}
@@ -155,24 +331,17 @@ object TestFeatures extends myAPP {
     //    /** one-hot编码 */
     //    import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer}
     //
-    //    val df2 = sqlc.createDataFrame(Seq(
-    //      (0, "a"),
-    //      (1, "b"),
-    //      (2, "c"),
-    //      (3, "a"),
-    //      (4, "a"),
-    //      (5, "c")
-    //    )).toDF("id", "category")
+        val df2 = sqlc.createDataFrame(Seq(
+          (0, "2018-05-28 00:00:00"),
+          (1, "2018-05-28 00:00:00"),
+          (2, "2018-05-28 00:00:00"),
+          (3, "2018-05-28 00:00:00"),
+          (4, "2018-05-28 00:00:00"),
+          (5, "2018-05-28 00:00:00")
+        )).toDF("id", "category")
+    df2.withColumn("new", substring(col("category"), 9, 2))
     //
     //
-    //    val df3 = sqlc.createDataFrame(Seq(
-    //      (0, "a"),
-    //      (1, "b"),
-    //      (2, "c"),
-    //      (3, "d"),
-    //      (4, "a"),
-    //      (5, "c")
-    //    )).toDF("someId", "category")
     //
     //    val indexer = new StringIndexer()
     //      .setInputCol("category")
@@ -190,6 +359,38 @@ object TestFeatures extends myAPP {
 
 
     /** hashing-TF */
+
+//
+//    class Item[-A](a: A){
+//      def check(a: A) = true
+//    }
+//    def getVolvo(v: Item[Volvo]) = {
+////      v.check(new VolvoWagon)
+//      true
+//    }
+//    val car1: Item[Car] = new Item[Car](new Car)
+//    val volvo1: Item[Volvo] = new Item(new Volvo)
+//    getVolvo(car1)
+//    getVolvo(volvo1)
+
+
+//    class Item[-A](a: A){
+//      def check(a: A) = true
+//    }
+//    val car1: Item[Car] = new Item(new Car)
+//    val volvo1: Item[Volvo] = new Item(new Volvo)
+//
+//    def getVolvo(volvo: Item[Volvo]) = true
+//    println(getVolvo(volvo1)) // 类型恰当
+//    println(getVolvo(car1)) // compiled，需要Item[+A]中Car转为了父类型Volvo，基类Car向下兼容为了子类Volvo，发生了逆变
+
+
+
+    //    /** 协变 */
+//    def getCar(car: Item[Car]) = true
+//    println(getCar(car1)) // 类型恰当
+//    println(getCar(volvo1)) // compile， 需要Item[+A]中Volvo转为了父类型Car，子类Volvo向上兼容为基类Car，发生了协变
+//
 
 
   }

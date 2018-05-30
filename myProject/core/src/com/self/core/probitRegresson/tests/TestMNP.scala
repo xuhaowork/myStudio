@@ -37,9 +37,9 @@ object TestMNP extends myAPP {
     val tableName = "tableName"
 
     /** 参数配置 */
-    val rawDataDF = z1.get("tableName").asInstanceOf[DataFrame]
+    val rawDataDF = outputrdd.get("tableName").asInstanceOf[DataFrame]
     //    val rawDataDF = z1.rdd(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
-
+    rawDataDF.show()
 
     /** 2)获取对应的特征列名 */
     var featuresSchema = ArrayBuffer.empty[(String, String)]
@@ -71,8 +71,8 @@ object TestMNP extends myAPP {
           dataType match {
             case "string" => row.getAs[String](name).toInt.toDouble
             case "int" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Int](name).toDouble
-            case "double" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Double](name).toInt.toDouble
-            case "float" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Float](name).toInt.toDouble
+            case "double" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Double](name)
+            case "float" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Float](name).toDouble
             case "long" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Long](name).toDouble
             case "boolean" => if (row.isNullAt(getIndex(name))) Double.NaN else if (row.getAs[Boolean](name)) 1.0 else 0.0
             case _ => throw new Exception(
@@ -92,7 +92,7 @@ object TestMNP extends myAPP {
       }
 
       LabeledPoint(label, new DenseVector(arr))
-    }).filter(labelPoint => !labelPoint.label.isNaN)
+    }).filter(labelPoint => !(labelPoint.label.isNaN || (labelPoint.features.toArray contains Double.NaN)))
 
     trainData.cache()
 
@@ -115,13 +115,13 @@ object TestMNP extends myAPP {
 
     println("classes:", numClasses)
 
-    /** 数据处理 */
+    /** 6)数据处理 */
     //    val optimizationOptionObj = pJsonParser.getAsJsonObject("optimizationOption")
     val optimizationOption = "SGD"
     val probitModel = optimizationOption match {
       case "SGD" =>
         val numIterations: Int = try {
-          val numString = "200"
+          val numString = "500"
           if (numString.eq(null)) 200 else numString.toInt
         } catch {
           case _: Exception => throw new Exception("没有找到最大迭代次数的信息")
@@ -137,22 +137,23 @@ object TestMNP extends myAPP {
         }
 
         val miniBatchFraction: Double = try {
-          val stepSizeString = "0.5"
-          val fraction = if (stepSizeString.eq(null)) 1.0 else stepSizeString.toDouble
+          val fractionString = "0.5"
+          val fraction = if (fractionString.eq(null)) 1.0 else fractionString.toDouble
           require(fraction <= 1.0 && fraction >= 0.0, "随机批次下降占比需要在0到1中间")
           fraction
         } catch {
           case _: Exception => throw new Exception("学习率信息异常")
         }
 
-        val addIntercept = try {
-          if ("false" == "true")
-            true
+        val addIntercept = if ("false" == "true") {
+          if (numClasses > 2)
+            throw new Exception("数据显示您有超过二分类的分类数，多于二分类目前不支持有截距项")
           else
-            false
-        } catch {
-          case _: Exception => throw new Exception("截距信息没有获得")
+            true
         }
+        else
+          false
+
 
         Probit.trainWithSGD(trainData, numClasses, numIterations, stepSize,
           miniBatchFraction, addIntercept)
@@ -200,51 +201,10 @@ object TestMNP extends myAPP {
     /** 输出结果 */
     newDataDF.show()
 
-
-
-
-
-
-    //    rawDataFrame.show()
-    //
-    //    //    val publicFeatures = Array(("收入", "double"))
-    //    val features = ArrayBuffer(("评分", "double"), ("距离", "double"))
-    //    //
-    //    val (labelName, labelType) = ("选择商场", "double")
-    //    //    val P = (J - 1) * publicFeatures.length + characterFeatures.length
-    //    val labelId = rawDataFrame.schema.fieldIndex(labelName)
-    //    val featuresMap = features.map {
-    //      case (name, dataType) => (rawDataFrame.schema.fieldIndex(name), dataType)
-    //    }
-    //
-    //    val rawData: RDD[LabeledPoint] = rawDataFrame.rdd.map(row => {
-    //      val features = featuresMap.map { case (id, dataType) =>
-    //        if (row.isNullAt(id))
-    //          Double.NaN
-    //        else {
-    //          dataType match {
-    //            case "string" => row.getAs[String](id).toDouble
-    //            case "long" => row.getAs[Long](id).toDouble
-    //            case "int" => row.getAs[Int](id).toDouble
-    //            case "double" => row.getAs[Double](id)
-    //          }
-    //        }
-    //      }
-    //      val label =
-    //        if (row.isNullAt(labelId))
-    //          Double.NaN
-    //        else {
-    //          labelType match {
-    //            case "string" => row.getAs[String](labelId).toDouble
-    //            case "long" => row.getAs[Long](labelId).toDouble
-    //            case "int" => row.getAs[Int](labelId).toDouble
-    //            case "double" => row.getAs[Double](labelId)
-    //          }
-    //        }
-    //
-    //      LabeledPoint(label, new DenseVector(features.toArray))
-    //    })
+    val precision = newDataDF.filter(s"($labelName - ${labelName + "_fit"}) < 0.1").count().toDouble / newDataDF.count()
+    println(s"准确率: ${precision*100}%")
 
 
   }
 }
+

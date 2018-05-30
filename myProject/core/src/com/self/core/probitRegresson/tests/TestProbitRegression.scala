@@ -19,9 +19,23 @@ import org.apache.spark.sql.{DataFrame, Row}
 
 import scala.collection.mutable.ArrayBuffer
 
+
+import org.apache.spark.mllib.classification.Probit
+import org.apache.spark.mllib.linalg.DenseVector
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.rdd.RDD
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.types.{DoubleType, StructField, StructType}
+import org.apache.spark.sql.{DataFrame, Row}
+
+import scala.collection.mutable.ArrayBuffer
+
+/**
+  * @author xuhao
+  */
 object TestProbitRegression extends myAPP {
   def generateData(): Unit = {
-    val data = TestData.simulate(1000, 123L, new DenseVector(Array(2.5, -0.7)), 7.5)
+    val data = TestData.simulate(10000, 123L, new DenseVector(Array(2.5, -0.7)), 7.5)
     val rowRdd = sc.parallelize(data).map(Row.fromSeq(_))
     val schema = StructType(Array(
       StructField("x1", DoubleType),
@@ -106,24 +120,24 @@ object TestProbitRegression extends myAPP {
     val probitModel = optimizationOption match {
       case "SGD" =>
         val numIterations: Int = try {
-          val numString = "200"
+          val numString = "2000"
           if (numString.eq(null)) 200 else numString.toInt
         } catch {
           case _: Exception => throw new Exception("没有找到最大迭代次数的信息")
         }
 
         val stepSize: Double = try {
-          val stepSizeString = "1.0"
+          val stepSizeString = "0.001"
           val learningRate = if (stepSizeString.eq(null)) 1.0 else stepSizeString.toDouble
-          require(learningRate <= 1.0 && learningRate >= 0.0, "学习率需要在0到1之间")
+          require(learningRate >= 0.0, "学习率需要在0到1之间")
           learningRate
         } catch {
           case _: Exception => throw new Exception("学习率信息异常")
         }
 
         val miniBatchFraction: Double = try {
-          val stepSizeString = "0.5"
-          val fraction = if (stepSizeString.eq(null)) 1.0 else stepSizeString.toDouble
+          val miniBatchFractionString = "1.0"
+          val fraction = if (miniBatchFractionString.eq(null)) 1.0 else miniBatchFractionString.toDouble
           require(fraction <= 1.0 && fraction >= 0.0, "随机批次下降占比需要在0到1中间")
           fraction
         } catch {
@@ -183,12 +197,15 @@ object TestProbitRegression extends myAPP {
 
 
     /** 输出结果 */
+    val precision = newDataDF.filter(s"abs($labelName - ${labelName + "_fit"}) < 0.1").count().toDouble / newDataDF.count()
+    println(s"准确率: ${precision*100}%")
+
     newDataDF.show()
 
-//        newDataDF.cache()
-//        outputrdd.put(rddTableName, newDataDF)
-//        newDataDF.registerTempTable(rddTableName)
-//        newDataDF.sqlContext.cacheTable(rddTableName)
+    //        newDataDF.cache()
+    //        outputrdd.put(rddTableName, newDataDF)
+    //        newDataDF.registerTempTable(rddTableName)
+    //        newDataDF.sqlContext.cacheTable(rddTableName)
 
 
   }
