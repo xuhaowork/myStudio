@@ -304,6 +304,10 @@ val gaussian = new Gaussian(0.0, 1.0)
 
     println(gaussian.cdf(0.0))
     println(gaussian.pdf(0.0))
+    println(gaussian.icdf(0.5))
+
+    println(-1.5.floor)
+    scala.math.exp(-2.0)
 
     //    import org.apache.spark.ml.feature.DCT
     //    import org.apache.spark.mllib.linalg.{Vectors, Vector}
@@ -340,6 +344,8 @@ val gaussian = new Gaussian(0.0, 1.0)
           (5, "2018-05-28 00:00:00")
         )).toDF("id", "category")
     df2.withColumn("new", substring(col("category"), 9, 2))
+
+
     //
     //
     //

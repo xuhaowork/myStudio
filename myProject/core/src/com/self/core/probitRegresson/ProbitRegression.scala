@@ -36,12 +36,12 @@ object ProbitRegression extends myAPP {
     val jsonparam = "<#zzjzParam#>"
     val gson = new Gson()
     val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
-    //    val z1 = z
+    val z1 = memoryMap
     val rddTableName = "<#zzjzRddName#>"
 
     /** 1)获取DataFrame */
     val tableName = p.get("inputTableName").trim
-    val rawDataDF = outputrdd.get(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
+    val rawDataDF = z1.get(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
     val parser = new JsonParser()
     val pJsonParser = parser.parse(jsonparam).getAsJsonObject
 
@@ -59,37 +59,64 @@ object ProbitRegression extends myAPP {
     val (labelName, labelDataType) = (labelObj.get("name").getAsString, labelObj.get("datatype").getAsString)
 
     /** 4)数据转换 */
+    val sche = rawDataDF.schema
+    val getIndex = (name: String) => try {
+      sche.fieldIndex(name)
+    } catch {
+      case _: Exception => throw new Exception(s"没有找到列名$name")
+    }
+
+
     val trainData: RDD[LabeledPoint] = rawDataDF.rdd.map(row => {
       val arr = featuresSchema.map {
         case (name, dataType) =>
           dataType match {
-            case "string" => row.getAs[String](name).toDouble
-            case "int" => row.getAs[Int](name).toDouble
-            case "double" => row.getAs[Double](name)
-            case "float" => row.getAs[Float](name).toDouble
-            case "long" => row.getAs[Long](name).toDouble
-            case "boolean" => if (row.getAs[Boolean](name)) 1.0 else 0.0
+            case "string" => row.getAs[String](name).toInt.toDouble
+            case "int" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Int](name).toDouble
+            case "double" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Double](name)
+            case "float" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Float](name).toDouble
+            case "long" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Long](name).toDouble
+            case "boolean" => if (row.isNullAt(getIndex(name))) Double.NaN else if (row.getAs[Boolean](name)) 1.0 else 0.0
             case _ => throw new Exception(
               "目前支持string、int、double、float、long以及boolean类型的特征字段")
           }
       }.toArray
 
       val label = labelDataType match {
-        case "string" => row.getAs[String](labelName).toDouble
-        case "int" => row.getAs[Int](labelName).toDouble
-        case "double" => row.getAs[Double](labelName)
-        case "float" => row.getAs[Float](labelName).toDouble
-        case "long" => row.getAs[Long](labelName).toDouble
-        case "boolean" => if (row.getAs[Boolean](labelName)) 1.0 else 0.0
+        case "string" => if (row.isNullAt(getIndex(labelName))) Double.NaN else row.getAs[String](labelName).toDouble.floor
+        case "int" => if (row.isNullAt(getIndex(labelName))) Double.NaN else row.getAs[Int](labelName).toDouble
+        case "double" => if (row.isNullAt(getIndex(labelName))) Double.NaN else row.getAs[Double](labelName).floor
+        case "float" => if (row.isNullAt(getIndex(labelName))) Double.NaN else row.getAs[Float](labelName).toDouble.floor
+        case "long" => if (row.isNullAt(getIndex(labelName))) Double.NaN else row.getAs[Long](labelName).toDouble
+        case "boolean" => if (row.isNullAt(getIndex(labelName))) Double.NaN else if (row.getAs[Boolean](labelName)) 1.0 else 0.0
         case _ => throw new Exception(
           "目前支持string、int、double、float、long以及boolean类型的特征字段")
       }
 
-      LabeledPoint(if (label > 0) 1.0 else 0.0, new DenseVector(arr))
-    })
+      LabeledPoint(label, new DenseVector(arr))
+    }).filter(labelPoint => !(labelPoint.label.isNaN || (labelPoint.features.toArray contains Double.NaN)))
+
+    trainData.cache()
+
+    /** 5)获得分类个数的信息 */
+    var numClasses = 0
+    val keysCount = trainData.map(u => (u.label, 1)).reduceByKey(_ + _)
+    numClasses = keysCount.keys.max().toInt + 1
 
 
-    /** 数据处理 */
+    if (keysCount.count() >= 100 || numClasses >= 100) {
+      throw new Exception("目前最多支持分类100个，请您检查是否是从0开始记入分类类别，或者您的标签列类别是否多于100")
+    }
+
+    val featureDims = trainData.first().features.size
+    val freedomNum = numClasses * (numClasses + 1) / 2 + featureDims
+    if (keysCount.values.sum() <= numClasses * (numClasses + 1) / 2 + featureDims)
+      throw new Exception(s"数据数目不够识别所有参数，数据应该多于自由度${freedomNum}才能满足过度识别")
+
+    println("classes:", numClasses)
+
+
+    /** 6)数据处理 */
     val optimizationOptionObj = pJsonParser.getAsJsonObject("optimizationOption")
     val optimizationOption = optimizationOptionObj.get("value").getAsString
     val probitModel = optimizationOption match {
@@ -104,31 +131,33 @@ object ProbitRegression extends myAPP {
         val stepSize: Double = try {
           val stepSizeString = optimizationOptionObj.get("stepSize")
           val learningRate = if (stepSizeString.eq(null)) 1.0 else stepSizeString.getAsString.toDouble
-          require(learningRate <= 1.0 && learningRate >= 0.0, "学习率需要在0到1中间")
+          require(learningRate > 0.0, "学习率需要大于0")
           learningRate
         } catch {
           case failure: Exception => throw new Exception(s"学习率信息异常, $failure")
         }
 
         val miniBatchFraction: Double = try {
-          val stepSizeString = optimizationOptionObj.get("miniBatchFraction")
-          val fraction = if (stepSizeString.eq(null)) 1.0 else stepSizeString.getAsString.toDouble
+          val miniBatchFractionString = optimizationOptionObj.get("miniBatchFraction")
+          val fraction = if (miniBatchFractionString.eq(null)) 1.0 else miniBatchFractionString.getAsString.toDouble
           require(fraction <= 1.0 && fraction >= 0.0, "随机批次下降占比需要在0到1中间")
           fraction
         } catch {
           case failure: Exception => throw new Exception(s"梯度下降批次信息异常$failure")
         }
 
-        val addIntercept = try {
-          if (optimizationOptionObj.get("addIntercept").getAsString == "true")
-            true
+
+        val addIntercept =
+          if (optimizationOptionObj.get("addIntercept").getAsString == "true") {
+            if (numClasses > 2)
+              throw new Exception("数据显示您有超过二分类的分类数，多于二分类目前不支持有截距项")
+            else
+              true
+          }
           else
             false
-        } catch {
-          case failure: Exception => throw new Exception(s"截距信息没有填写, $failure")
-        }
 
-        Probit.trainWithSGD(trainData, 2, numIterations, stepSize,
+        Probit.trainWithSGD(trainData, numClasses, numIterations, stepSize,
           miniBatchFraction, addIntercept)
 
       case "LBFGS" =>
@@ -140,7 +169,7 @@ object ProbitRegression extends myAPP {
         } catch {
           case _: Exception => throw new Exception("截距信息没有获得")
         }
-        Probit.trainWithLBFGS(trainData, 2, addIntercept)
+        Probit.trainWithLBFGS(trainData, numClasses, addIntercept)
     }
 
     val probitModelBC = rawDataDF.sqlContext.sparkContext.broadcast(probitModel).value
@@ -170,12 +199,15 @@ object ProbitRegression extends myAPP {
     println("intercept:")
     println(probitModel.intercept)
 
+    val precision = newDataDF.filter(s"abs($labelName - ${labelName + "_fit"}) < 0.1").count().toDouble / newDataDF.count()
+    println(s"准确率: ${precision * 100}%")
 
     /** 输出结果 */
     newDataDF.cache()
     outputrdd.put(rddTableName, newDataDF)
     newDataDF.registerTempTable(rddTableName)
     newDataDF.sqlContext.cacheTable(rddTableName)
+
 
 
   }

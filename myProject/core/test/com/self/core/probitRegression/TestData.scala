@@ -1,4 +1,4 @@
-package com.self.core.probitRegresson.tests
+package com.self.core.probitRegression
 
 import java.util.Random
 
@@ -19,7 +19,6 @@ import org.apache.spark.sql.{DataFrame, Row, SQLContext}
   */
 
 object TestData {
-
   /**
     * 模拟测试数据的类
     *
@@ -37,7 +36,7 @@ object TestData {
     import breeze.stats.distributions.Gaussian
     val gaussian = new Gaussian(0.0, 1.0)
 
-    Array.fill(num)(new DenseVector(Array(rd.nextGaussian(), rd.nextGaussian() * 5 + 10.0)))
+    Array.fill(num)(new DenseVector(Array(rd.nextGaussian()*2 + 1.0, rd.nextGaussian())))
       .map(v => {
         val label = if (rd.nextDouble() <= gaussian.cdf(dot(v, weight) + intercept)) 1.0 else 0.0
         v.values :+ label
@@ -73,7 +72,7 @@ object TestData {
     import org.apache.spark.mllib.linalg.DenseVector
     import org.apache.spark.mllib.util.VectorBLAS.dot
     val rd = new java.util.Random(123L)
-    val arr = Array.tabulate(100, 2)((_, _) => rd.nextGaussian())
+    val arr = Array.tabulate(5000, 2)((_, _) => rd.nextGaussian())
 
     val beta0 = new DenseVector(Array(0.9, 0.3))
     val beta1 = new DenseVector(Array(-0.45, -1.3))
@@ -107,6 +106,5 @@ object TestData {
     )))
 
   }
-
 
 }

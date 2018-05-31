@@ -1,14 +1,5 @@
 package org.apache.spark.mllib.classification
 
-/**
-  * probit回归的核心运算API
-  */
-
-/**
-  * editor: datashoe
-  * date: 2018-05-15 10:30:00
-  */
-
 import breeze.stats.distributions.Gaussian
 import org.apache.spark.SparkContext
 import org.apache.spark.annotation.Since
@@ -23,6 +14,15 @@ import org.apache.spark.mllib.util.ToolsForMNP._
 import org.apache.spark.mllib.util.{DataValidators, Saveable}
 import org.apache.spark.rdd.RDD
 
+
+/**
+  * probit回归的核心运算API
+  */
+
+/**
+  * editor: datashoe
+  * date: 2018-05-15 10:30:00
+  */
 class ProbitGradient(val numClasses: Int, var diff: Double, var smoothSampleTimes: Int) extends Gradient {
   //  require(numClasses == 2, "目前只支持二分类")
 
@@ -56,31 +56,20 @@ class ProbitGradient(val numClasses: Int, var diff: Double, var smoothSampleTime
 
     numClasses match {
       case 2 =>
-        // (weights.size / dataSize + 1) is number of classes
         require(weights.size % dataSize == 0 && numClasses == weights.size / dataSize + 1)
 
         val q = 2 * label - 1.0
         val margin = dot(data, weights)
         val qMargin: Double = q * margin
         val gaussian = new Gaussian(0.0, 1.0)
-        val multiplier = q * gaussian.pdf(qMargin) / (gaussian.cdf(qMargin) + 1E-4)
+        val multiplier = -q * gaussian.pdf(qMargin) / (gaussian.cdf(qMargin) + 1E-4)
 
         axpy(multiplier, data, cumGradient)
 
         val cdfMargin = gaussian.cdf(margin)
-        if (label > 0) {
-          if (cdfMargin <= 0.0)
-            Double.MinValue
-          else
-            scala.math.log(cdfMargin)
-        } else {
-          if (cdfMargin >= 1.0)
-            Double.MinValue
-          else
-            scala.math.log(1 - cdfMargin)
-        }
+        -label*scala.math.log(cdfMargin + 1E-4) - (1 - label)*scala.math.log(1 - cdfMargin + 1E-4)
 
-      case num: Int => {
+      case num: Int =>
         // 数值求导
         val oldLoss: Double = getNegativeLogLikelihood(data: linalg.Vector,
           label: Double,
@@ -88,20 +77,19 @@ class ProbitGradient(val numClasses: Int, var diff: Double, var smoothSampleTime
           num: Int)
         val gradient =
           for (i <- 0 until weights.size) yield {
-            val denseWeights = weights.toDense
-            denseWeights.values(i) = denseWeights.values(i) + scala.math.min(denseWeights.values(i), 1.0) * diff
+            val denseWeights = weights.copy.toDense
+            val addTerm = scala.math.max(denseWeights.values(i), 1.0) * diff
+            denseWeights.values(i) = denseWeights.values(i) + addTerm
             val newLoss = getNegativeLogLikelihood(data: linalg.Vector,
               label: Double,
               denseWeights: linalg.Vector,
               num: Int,
               smoothSampleTimes: Int
             )
-            (newLoss - oldLoss) / diff
+            (newLoss - oldLoss) / addTerm
           }
         axpy(1.0, new linalg.DenseVector(gradient.toArray), cumGradient)
         oldLoss
-      }
-
     }
 
   }
@@ -119,7 +107,6 @@ class ProbitRegressionWithSGD private[mllib](
   private var numClasses: Int = 2
 
   this.setFeatureScaling(false)
-
 
   def setNumClasses(numClasses: Int): this.type = {
     require(numClasses > 1, "分类数需要大于1")
@@ -199,9 +186,7 @@ class ProbitRegressionModel(
                              val numClasses: Int)
   extends GeneralizedLinearModel(weights, intercept) with ClassificationModel with Serializable
     with Saveable with PMMLExportable {
-  /**
-    * Constructs a [[LogisticRegressionModel]] with weights and intercept for binary classification.
-    */
+
   def this(weights: Vector, intercept: Double) = this(weights, intercept, weights.size, 2)
 
   private var threshold: Option[Double] = Some(0.5)
@@ -298,6 +283,8 @@ object Probit {
     val rd = new java.util.Random(123L)
     var size = featureNums * numClasses + numClasses * (numClasses - 1) / 2
     if (numClasses > 2) {
+      if(numClasses > 2)
+        require(!intercept, "多分类不支持截距项")
       val initialWeights =
         if (intercept) {
           size += (if (numClasses == 2) 1 else numClasses)
@@ -326,7 +313,7 @@ object Probit {
     } else {
       val initialWeights = Vectors.zeros(featureNums)
       new ProbitRegressionWithSGD(stepSize, numIterations, 0.0, miniBatchFraction)
-        .setIntercept(intercept)
+        .setIntercept(intercept).setFeatureScaling(false)
         .run(input, initialWeights)
     }
   }
@@ -354,7 +341,9 @@ object Probit {
                       numClasses: Int,
                       addIntercept: Boolean
                     ): ProbitRegressionModel = {
-    new ProbitRegressionWithLBFGS()
+    if(numClasses > 2)
+      require(!addIntercept, "多分类不支持截距项")
+    new ProbitRegressionWithLBFGS(numClasses)
       .setIntercept(addIntercept)
       .setValidateData(false)
       .run(input)
