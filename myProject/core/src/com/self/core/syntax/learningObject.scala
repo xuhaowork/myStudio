@@ -3,6 +3,10 @@ package com.self.core.syntax
 //import java.text.SimpleDateFormat
 //
 import com.self.core.baseApp.myAPP
+import org.apache.spark.sql.Row
+import org.apache.spark.sql.types._
+
+import scala.collection.mutable
 //import org.apache.spark.deploy.master.Master
 //import org.apache.spark.rdd.RDD
 //import org.apache.spark.sql.DataFrame
@@ -222,31 +226,53 @@ object learningObject extends myAPP with Serializable {
 
     import scala.reflect.ClassTag
 
-    val df = sqlc.createDataFrame(Seq(
-      (0, "a"),
-      (1, "b"),
-      (2, "c")
-    )).toDF("someId", "category")
 
-    def getRdd(): RDD[String] = df.rdd.map(row => row.getAs[String](1))
 
-    def getDataFrame(): DataFrame = df.select("category")
+//    println(df.schema.fields.map(_.dataType).mkString(","))
+//    df.rdd.foreach(row => {
+//      row.get(1) match {
+//        case _: Seq[StructType] => println("good")
+//        case _: Seq[Row] => println("bad")
+//
+//      }
+//    })
 
-    class TwoTypeOutput[T <: Serializable : ClassTag]() {
-      def generate(method: () => T): T = {
-        type method1 = () => RDD[String]
-        type method2 = () => DataFrame
 
-        method match {
-          case mth1: method1 => mth1()
-          case mth2: method2 => mth2()
-          case _ => throw new Exception("不支持其他类型的函数")
-        }
-      }
+//
+//    def getRdd(): RDD[String] = df.rdd.map(row => row.getAs[String](1))
+//
+//    def getDataFrame(): DataFrame = df.select("category")
+//
+//    class TwoTypeOutput[T <: Serializable : ClassTag]() {
+//      def generate(method: () => T): T = {
+//        type method1 = () => RDD[String]
+//        type method2 = () => DataFrame
+//
+//        method match {
+//          case mth1: method1 => mth1()
+//          case mth2: method2 => mth2()
+//          case _ => throw new Exception("不支持其他类型的函数")
+//        }
+//      }
+//    }
+//
+//    new TwoTypeOutput[DataFrame]().generate(getDataFrame).show(3)
+//    new TwoTypeOutput[RDD[String]]().generate(getRdd).take(3).foreach(println)
+    import scala.collection.mutable.HashSet
+
+    val hashSet = new mutable.HashSet[Int]()
+    for(x <- Array(1, 2, 3, 5, 8)){
+      hashSet += x
     }
+    println(hashSet)
+    println(Array(1, 2, 3, 5, 8).distinct.mkString(", "))
 
-    new TwoTypeOutput[DataFrame]().generate(getDataFrame).show(3)
-    new TwoTypeOutput[RDD[String]]().generate(getRdd).take(3).foreach(println)
+
+
+
+
+
+
 
 
   }

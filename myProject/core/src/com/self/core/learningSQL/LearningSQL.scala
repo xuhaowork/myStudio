@@ -3,7 +3,7 @@ package com.self.core.learningSQL
 import com.self.core.baseApp.myAPP
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.types.{DoubleType, StringType, StructField, StructType}
+import org.apache.spark.sql.types._
 import org.apache.spark.sql.catalyst.trees
 import org.apache.spark.ml.feature._
 
@@ -135,6 +135,33 @@ object LearningSQL extends myAPP{
 //    newDataFrame.sqlContext.cacheTable("<#zzjzRddName#>")
 
     println(sqlc.getConf("spark.sql.inMemoryColumnarStorage.compressed"))
+
+
+    val schema = StructType(Seq(StructField("numbsToEValue",ArrayType(StringType,true)), StructField("lineToColValue",ArrayType(StructType(Seq(StructField("coorX",DoubleType,false), StructField("coorY",DoubleType,false)))),true)))
+
+    case class person(name: String, age: Int)
+    class PersonType extends DataType{
+      override def defaultSize: Int = 0
+      override def asNullable: PersonType  = this
+    }
+
+    DoubleType
+    case object PersonType extends PersonType
+    val rdd = sc.parallelize(Seq(
+      Row(0, person("a", 1)),
+      Row(1, person("a", 1)),
+      Row(2, person("a", 1))
+    ))
+
+    val rdd2 = sc.parallelize(Seq(
+      Row(0, 0.1),
+      Row(1, 0.2),
+      Row(2, 0.3)
+    ))
+    val df = sqlc.createDataFrame(rdd, StructType(Array(StructField("id", IntegerType), StructField("person", PersonType))))
+    df.show()
+
+
 
 
   }
