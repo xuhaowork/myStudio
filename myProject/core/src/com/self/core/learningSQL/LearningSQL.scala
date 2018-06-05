@@ -201,7 +201,43 @@ object LearningSQL extends myAPP {
 
     // action操作
 
-    df2.collect() //通过sqlContext优化后的方案，通过withCallback函数执行。
+    df2.collect() //通过sqlContext优化后的方案，通过withCallback触发action、操作。
+    // 源自QueryExecution
+//lazy val analyzed: LogicalPlan = sqlContext.analyzer.execute(logical)
+//    // 1)先解析 结合schema或者meta-store信息生成带catalog的LogicalPlan
+//    lazy val withCachedData: LogicalPlan = {
+//      assertAnalyzed()
+//      sqlContext.cacheManager.useCachedData(analyzed)
+//    }
+    // 2)结合cache信息
+//
+//    lazy val optimizedPlan: LogicalPlan = sqlContext.optimizer.execute(withCachedData)
+//  3）最后化logicalPlan
+//    lazy val sparkPlan: SparkPlan = {
+//      SQLContext.setActive(sqlContext)
+//      sqlContext.planner.plan(optimizedPlan).next()
+//    }
+//
+//    // executedPlan should not be used to initialize any SparkPlan. It should be
+//    // only used for execution.
+//    lazy val executedPlan: SparkPlan = sqlContext.prepareForExecution.execute(sparkPlan)
+//  4)生成物理的执行计划
+//    /** Internal version of the RDD. Avoids copies and has no schema */
+//    lazy val toRdd: RDD[InternalRow] = executedPlan.execute()
+    // 5)执行LogicalPlan
+
+    // 此处
+    // 1)先解析
+    // 2)
+    // 3)通过sqlContext.prepareForExecution生成可执行的物理计划
+//        plan.metrics.valuesIterator.foreach(_.reset())
+//      }
+//      val result = action(df)
+
+
+    df2.count() // 其实是agg + collect
+
+
 
 
   }
