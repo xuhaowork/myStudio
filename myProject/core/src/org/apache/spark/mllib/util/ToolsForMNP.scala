@@ -7,6 +7,7 @@ import breeze.stats.distributions.Gaussian
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.BLAS.axpy
 
+
 object ToolsForMNP extends Serializable {
 
   // 模拟多元正态分布
@@ -74,7 +75,11 @@ object ToolsForMNP extends Serializable {
 
     val betaArray = weights.first(num * data.size)
     val beta = new BDM[Double](num, data.size, betaArray, 0, data.size, true) // num * p维
-    val a = Aq * beta * data.toBreeze // (num * num) * (num * p) * (p * 1) = num * 1维
+
+
+    val a = Aq * beta * {
+      new BDV[Double](data.toDense.values)
+    } // (num * num) * (num * p) * (p * 1) = num * 1维
 
     -scala.math.log(ToolsForMNP.smoothRecurse(R, P_triangle, a, seed) + 1E-7) // 通过MC(GHK-smooth recurse方法)求近似似然
   }
