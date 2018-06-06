@@ -237,6 +237,36 @@ object LearningSQL extends myAPP {
 
     df2.count() // 其实是agg + collect
 
+    df2.sqlContext.cacheTable("tableName") // 执行 command类型
+    // 首先，会通过SQLParser parse这个tableName找到对应的TableIdentifier
+    // 其次，通过TableIdentifier找到对应的LogicalPlan得到对应的DataFrame
+    // 最后，通过cacheManager.cacheQuery执行cache操作
+
+    df2.select("")
+
+    df2.sqlContext.sql("select * from tableName") // 执行一般的sql语句
+
+
+    df.cache()
+
+    import org.apache.spark.sql.functions.col
+
+    val dataFrame = sqlc.createDataFrame(Seq(
+      ("1", 2, 10),
+      ("2", 2, 8),
+      ("3", 4, 7)
+    )).toDF("id", "height", "weight")
+    val tableName = "tableName"
+    dataFrame.registerTempTable(tableName)
+
+    dataFrame.cache() // cache as RDD[Row]
+//    dataFrame.sqlContext.cacheTable(tableName) // cache by columnar storage
+
+    dataFrame.count()
+
+    dataFrame.select(col("id"),
+      col("height") * col("weight").alias("multiply"))
+      .collect().foreach(println) // which memory?
 
 
 
