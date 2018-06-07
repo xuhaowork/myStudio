@@ -3,10 +3,11 @@ package com.self.core.featureTransform
 import breeze.linalg.{DenseVector => BDV}
 import breeze.stats.distributions.Gaussian
 import com.self.core.baseApp.myAPP
+import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.functions.{col, substring}
-import org.apache.spark.sql.types.DoubleType
+import org.apache.spark.sql.types.{DoubleType, StringType, StructField}
 
 import scala.Serializable
 
@@ -248,7 +249,7 @@ object TestFeatures extends myAPP {
 
     val indexer = new StringIndexer()
       .setInputCol("category")
-      .setOutputCol("categoryIndex")
+      .setOutputCol("categoryIndex").setHandleInvalid("skip")
       .fit(df)
     val indexed = indexer.transform(df)
 
@@ -258,6 +259,239 @@ object TestFeatures extends myAPP {
 
     val converted = converter.transform(indexed)
     converted.select("id", "originalCategory").show()
+  }
+
+  def feature23() = {
+    import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer}
+
+    val df = sqlc.createDataFrame(Seq(
+      (0, "a"),
+      (1, "b"),
+      (2, "c"),
+      (3, "a"),
+      (4, "a"),
+      (5, "c")
+    )).toDF("id", "category")
+
+    val indexer = new StringIndexer()
+      .setInputCol("category")
+      .setOutputCol("categoryIndex")
+      .fit(df)
+    val indexed = indexer.transform(df)
+
+    indexed.show()
+    val encoder = new OneHotEncoder()
+      .setInputCol("categoryIndex")
+      .setOutputCol("categoryVec").setDropLast(false)
+    val encoded = encoder.transform(indexed)
+    encoded.select("id", "categoryVec").show()
+  }
+
+  def feature24() = {
+    import org.apache.spark.ml.feature.VectorIndexer
+
+    val data = sqlc.read.format("libsvm").load("F:/scala-spark/lib/spark-2.0.0-bin-hadoop2.6/spark-2.0.0-bin-hadoop2.6/data//mllib/sample_libsvm_data.txt")
+
+    data.show()
+
+    val indexer = new VectorIndexer()
+      .setInputCol("features")
+      .setOutputCol("indexed")
+      .setMaxCategories(10)
+
+    val indexerModel = indexer.fit(data)
+
+    val categoricalFeatures: Set[Int] = indexerModel.categoryMaps.keys.toSet
+    println(s"Chose ${categoricalFeatures.size} categorical features: " +
+      categoricalFeatures.mkString(", "))
+
+    // Create new column "indexed" with categorical values transformed to indices
+    val indexedData = indexerModel.transform(data)
+    indexedData.show()
+  }
+
+
+  def feature25() = {
+    /** 正则化 */
+    import org.apache.spark.ml.feature.Normalizer
+
+    val data = Seq(
+      Vectors.dense(0.0, 1.0, -2.0),
+      Vectors.dense(-1.0, 2.0, 4.0, -7.0),
+      Vectors.dense(14.0))
+
+    val dataFrame = sqlc.createDataFrame(data.map(Tuple1.apply)).toDF("features")
+
+    dataFrame.show()
+
+    // Normalize each Vector using $L^1$ norm.
+    val normalizer = new Normalizer()
+      .setInputCol("features")
+      .setOutputCol("normFeatures")
+      .setP(2.0)
+
+    val l1NormData = normalizer.transform(dataFrame)
+    l1NormData.show()
+
+    // Normalize each Vector using $L^\infty$ norm.
+    val lInfNormData = normalizer.transform(dataFrame, normalizer.p -> Double.PositiveInfinity)
+    lInfNormData.show()
+  }
+
+  def feature26() = {
+    /** 标准化 */
+    /** z-score */
+    import org.apache.spark.ml.feature.StandardScaler
+
+    val data = Seq(
+      Vectors.dense(0.0, 1.0, -2.0, 3.0),
+      Vectors.dense(-1.0, 2.0, 4.0, -7.0),
+      Vectors.dense(13.0, 14.0, 14.0, 14.0))
+
+    val dataFrame = sqlc.createDataFrame(data.map(Tuple1.apply)).toDF("features")
+
+    dataFrame.show()
+
+    val scaler = new StandardScaler()
+      .setInputCol("features")
+      .setOutputCol("scaledFeatures")
+      .setWithStd(false)
+      .setWithMean(true)
+
+    // Compute summary statistics by fitting the StandardScaler.
+    val scalerModel = scaler.fit(dataFrame)
+
+    // Normalize each feature to have unit standard deviation.
+    val scaledData = scalerModel.transform(dataFrame)
+    scaledData.show()
+
+    /** min-max */
+    import org.apache.spark.ml.feature.MinMaxScaler
+    val scaler2 = new MinMaxScaler()
+      .setInputCol("features")
+      .setOutputCol("scaledFeatures").setMax(100.0)
+
+    // Compute summary statistics and generate MinMaxScalerModel
+    val scalerModel2 = scaler2.fit(dataFrame)
+
+    // rescale each feature to range [min, max].
+    val scaledData2 = scalerModel2.transform(dataFrame)
+    scaledData2.show()
+
+  }
+
+  def feature27() = {
+    import org.apache.spark.ml.feature.ElementwiseProduct
+    import org.apache.spark.mllib.linalg.Vectors
+
+    // Create some vector data; also works for sparse vectors
+    val dataFrame = sqlc.createDataFrame(Seq(
+      ("a", Vectors.dense(1.0, 2.0, 3.0)),
+      ("b", Vectors.dense(4.0, 5.0, 6.0)))).toDF("id", "vector")
+
+    dataFrame.show()
+
+    val transformingVector = Vectors.dense(0.0, 1.0, 2.0)
+    val transformer = new ElementwiseProduct()
+      .setScalingVec(transformingVector)
+      .setInputCol("vector")
+      .setOutputCol("transformedVector")
+
+    // Batch transform the vectors to create new column:
+    transformer.transform(dataFrame).show()
+
+  }
+
+
+  def feature28() = {
+    import org.apache.spark.ml.feature.VectorAssembler
+    import org.apache.spark.mllib.linalg.Vectors
+
+    val dataset = sqlc.createDataFrame(
+      Seq((0, Array(18, 17, 16), Vectors.dense(10.0, 0.5), Vectors.dense(0.0, 10.0, 0.5), 1.0))
+    ).toDF("id", "hour", "mobile", "userFeatures", "clicked")
+
+    dataset.show()
+
+    val assembler = new VectorAssembler()
+      .setInputCols(Array("hour", "mobile", "userFeatures"))
+      .setOutputCol("features")
+
+    val output = assembler.transform(dataset)
+    println(output.select("features", "clicked").first())
+
+  }
+
+  def feature29() = {
+    import org.apache.spark.ml.feature.QuantileDiscretizer
+
+    val data = Array((0, 18.0), (1, 19.0), (2, 8.0), (3, 5.0), (4, 2.2))
+    val df = sqlc.createDataFrame(data).toDF("id", "hour")
+
+    df.show()
+
+    val discretizer = new QuantileDiscretizer()
+      .setInputCol("hour")
+      .setOutputCol("result")
+      .setNumBuckets(5)
+
+    val result = discretizer.fit(df).transform(df)
+    result.show()
+
+  }
+
+  def feature30() = {
+    import java.util.Arrays
+
+    import org.apache.spark.ml.attribute.{Attribute, AttributeGroup, NumericAttribute}
+    import org.apache.spark.ml.feature.VectorSlicer
+    import org.apache.spark.mllib.linalg.Vectors
+    import org.apache.spark.sql.Row
+    import org.apache.spark.sql.types.StructType
+
+    val data = Arrays.asList(Row("1", Vectors.dense(-2.0, 2.3, 0.0)))
+
+    val defaultAttr = NumericAttribute.defaultAttr
+    val attrs = Array("f1", "f2", "f3").map(defaultAttr.withName)
+    val attrGroup = new AttributeGroup("userFeatures", attrs.asInstanceOf[Array[Attribute]])
+
+    val dataset = sqlc.createDataFrame(data, StructType(Array(StructField("id", StringType), attrGroup.toStructField())))
+
+    dataset.show()
+    println(dataset.schema)
+
+    val slicer = new VectorSlicer().setInputCol("userFeatures").setOutputCol("features")
+
+    slicer.setIndices(Array(1)).setNames(Array("f3"))
+    // or slicer.setIndices(Array(1, 2)), or slicer.setNames(Array("f2", "f3"))
+
+    val output = slicer.transform(dataset)
+    println(output.select("id", "userFeatures", "features").first())
+
+  }
+
+  def feature31() = {
+    import org.apache.spark.ml.feature.ChiSqSelector
+    import org.apache.spark.mllib.linalg.Vectors
+
+    val data = Seq(
+      (7, Vectors.dense(0.0, 0.0, 18.0, 1.0), 1.0),
+      (8, Vectors.dense(0.0, 1.0, 12.0, 0.0), 0.0),
+      (9, Vectors.dense(1.0, 0.0, 15.0, 0.1), 0.0)
+    )
+
+    val df = sqlc.createDataFrame(data).toDF("id", "features", "clicked")
+
+    df.show()
+
+    val selector = new ChiSqSelector()
+      .setFeaturesCol("features").setNumTopFeatures(2)
+      .setLabelCol("clicked")
+      .setOutputCol("selectedFeatures")
+
+    val result = selector.fit(df).transform(df)
+    result.show()
+
   }
 
 
@@ -299,15 +533,33 @@ object TestFeatures extends myAPP {
     /** 1-12 Double标签转为String标签 */
 //    feature22()
 
+    /** 1-13 独热编码 */
+//    feature23()
 
-val gaussian = new Gaussian(0.0, 1.0)
+    /** 1-14 低变异性数值特征转类别特征 */
+//    feature24()
 
-    println(gaussian.cdf(0.0))
-    println(gaussian.pdf(0.0))
-    println(gaussian.icdf(0.5))
+    /** 1-15 正则化 */
+//    feature25()
 
-    println(-1.5.floor)
-    scala.math.exp(-2.0)
+    /** 1-16 标准化 */
+//    feature26()
+
+    /** 1-17 向量加权 */
+//    feature27()
+
+    /** 1-18 向量集成 */
+//    feature28()
+
+    /** 1-19 分箱 */
+//    feature29()
+
+    /** 1-20 取子向量 */
+    feature30()
+
+    /** 1-21 卡方特征选择 */
+    feature31()
+
 
     //    import org.apache.spark.ml.feature.DCT
     //    import org.apache.spark.mllib.linalg.{Vectors, Vector}
@@ -335,15 +587,6 @@ val gaussian = new Gaussian(0.0, 1.0)
     //    /** one-hot编码 */
     //    import org.apache.spark.ml.feature.{OneHotEncoder, StringIndexer}
     //
-        val df2 = sqlc.createDataFrame(Seq(
-          (0, "2018-05-28 00:00:00"),
-          (1, "2018-05-28 00:00:00"),
-          (2, "2018-05-28 00:00:00"),
-          (3, "2018-05-28 00:00:00"),
-          (4, "2018-05-28 00:00:00"),
-          (5, "2018-05-28 00:00:00")
-        )).toDF("id", "category")
-    df2.withColumn("new", substring(col("category"), 9, 2))
 
 
     //
