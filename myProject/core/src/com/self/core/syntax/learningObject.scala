@@ -260,12 +260,14 @@ object learningObject extends myAPP with Serializable {
 //    new TwoTypeOutput[RDD[String]]().generate(getRdd).take(3).foreach(println)
     import scala.collection.mutable.HashSet
 
-    val hashSet = new mutable.HashSet[Int]()
-    for(x <- Array(1, 2, 3, 5, 8)){
-      hashSet += x
+
+    def setA(name: String, age: Int, check: (String, Int) => Boolean = (_, _) => true) = {
+      require(check(name, age), "error")
+      println(name)
+      println(age)
     }
-    println(hashSet)
-    println(Array(1, 2, 3, 5, 8).distinct.mkString(", "))
+
+    setA("John", 18)
 
 
 

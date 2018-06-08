@@ -1,15 +1,11 @@
 package com.self.core.featureTransform
 
-import breeze.linalg.{DenseVector => BDV}
-import breeze.stats.distributions.Gaussian
+
 import com.self.core.baseApp.myAPP
 import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{DataFrame, Row}
 import org.apache.spark.sql.functions.{col, substring}
 import org.apache.spark.sql.types.{DoubleType, StringType, StructField}
-
-import scala.Serializable
 
 object TestFeatures extends myAPP {
   def feature11(): Unit = {
@@ -555,10 +551,12 @@ object TestFeatures extends myAPP {
 //    feature29()
 
     /** 1-20 取子向量 */
-    feature30()
+//    feature30()
 
     /** 1-21 卡方特征选择 */
-    feature31()
+//    feature31()
+
+
 
 
     //    import org.apache.spark.ml.feature.DCT

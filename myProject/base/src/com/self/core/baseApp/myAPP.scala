@@ -14,11 +14,12 @@ abstract class myAPP {
   lazy val sc = new SparkContext(conf)
   lazy val sqlc = new SQLContext(sc)
   lazy val hqlc = sqlc
-  lazy  val smc : StreamingContext = new StreamingContext(conf, Seconds(1))
-  lazy val memoryMap: java.util.Map[java.lang.String,java.lang.Object] = new HashMap[java.lang.String, java.lang.Object]()
-  lazy val outputrdd: java.util.Map[java.lang.String,java.lang.Object]= new HashMap[java.lang.String,java.lang.Object]();
+  lazy val smc: StreamingContext = new StreamingContext(conf, Seconds(1))
+  lazy val memoryMap: java.util.Map[java.lang.String, java.lang.Object] = new HashMap[java.lang.String, java.lang.Object]()
+  lazy val outputrdd: java.util.Map[java.lang.String, java.lang.Object] = new HashMap[java.lang.String, java.lang.Object]();
 
   def run(): Unit
+
   def main(args: Array[String]): Unit = {
     run()
   }
