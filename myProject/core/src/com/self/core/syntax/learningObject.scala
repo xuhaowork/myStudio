@@ -261,13 +261,14 @@ object learningObject extends myAPP with Serializable {
     import scala.collection.mutable.HashSet
 
 
-    def setA(name: String, age: Int, check: (String, Int) => Boolean = (_, _) => true) = {
-      require(check(name, age), "error")
+    def setA(name: String, age: Int) = {
       println(name)
       println(age)
     }
 
     setA("John", 18)
+
+
 
 
 

@@ -548,7 +548,7 @@ object TestFeatures extends myAPP {
 //    feature28()
 
     /** 1-19 分箱 */
-//    feature29()
+    feature29()
 
     /** 1-20 取子向量 */
 //    feature30()
