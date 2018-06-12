@@ -202,6 +202,238 @@ class CountWordVector(override val data: DataFrame) extends Pretreater[OnlyOneDF
 }
 
 
+class HashTF(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+
+  import org.apache.spark.ml.feature.HashingTF
+
+
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): OnlyOneDFOutput = {
+
+
+    val inputCol = getParams[String](HashTFParamsName.inputCol)
+    val outputCol = getParams[String](HashTFParamsName.outputCol)
+    val numFeatures = getParamsOrElse[Int](HashTFParamsName.numFeatures, 1 << 18) // 默认 1 << 18, 不能超过int的最大值
+
+    val tfDataFrame = new HashingTF()
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .setNumFeatures(numFeatures)
+      .transform(data)
+    new OnlyOneDFOutput(tfDataFrame)
+  }
+
+}
+
+
+class WordToVector(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+
+  override protected def runAlgorithm(): OnlyOneDFOutput = {
+    import org.apache.spark.ml.feature.{Word2Vec, Word2VecModel}
+
+    val inputCol = getParams[String](WordToVectorParamsName.inputCol) // 这个需要在模型中再设置一次
+    val outputCol = getParams[String](WordToVectorParamsName.outputCol)
+    val loadModel = getParamsOrElse[Boolean](WordToVectorParamsName.loadModel, false)
+
+    val wvModel = if (loadModel) {
+      val loadPath = getParams[String](WordToVectorParamsName.loadPath)
+      Word2VecModel.load(loadPath)
+    } else {
+      val trainData = getParamsOrElse[DataFrame](WordToVectorParamsName.trainData, data)
+      // 如果不输入默认训练数据就是预测数据
+
+      val trainInputCol = getParamsOrElse[String](WordToVectorParamsName.trainInputCol,
+        inputCol) // 如果不输入默认训练数据就是预测数据
+
+      val trainOutputCol = getParamsOrElse[String](WordToVectorParamsName.trainOutputCol,
+        outputCol) // 如果不输入默认训练数据就是预测数据
+
+      val rdSeed = new java.util.Random().nextLong()
+
+      val vocabSize = getParamsOrElse[Int](WordToVectorParamsName.vocabSize, 1 << 18) // 默认 2^18
+      val windowSize = getParamsOrElse[Int](WordToVectorParamsName.windowSize, 5) // 默认1.0
+      val stepSize = getParamsOrElse[Double](WordToVectorParamsName.stepSize, 0.025) // 默认1.0 这里会设置一次，因为可能持久化
+      val numPartitions = getParamsOrElse[Int](WordToVectorParamsName.numPartitions, 1) // 默认1.0 这里会设置一次，因为可能持久化
+      val numIterations = getParamsOrElse[Int](WordToVectorParamsName.numIterations, 1) // 默认1.0 这里会设置一次，因为可能持久化
+      val minCount = getParamsOrElse[Int](WordToVectorParamsName.minCount, 5)
+      val seed = getParamsOrElse[Long](WordToVectorParamsName.seed, rdSeed)
+
+      val model = new Word2Vec()
+        .setInputCol(trainInputCol)
+        .setOutputCol(trainOutputCol)
+        .setVectorSize(vocabSize)
+        .setMinCount(minCount)
+        .setMaxIter(numIterations)
+        .setWindowSize(windowSize)
+        .setSeed(seed)
+        .setNumPartitions(numPartitions)
+        .setStepSize(stepSize)
+        .fit(trainData)
+
+      val saveModel = getParamsOrElse[Boolean](WordToVectorParamsName.saveModel, false) // 默认不保存
+      val savePath = getParamsOrElse[String](WordToVectorParamsName.savePath, "/data/wordToVectorModel/") // if 保存 --必须输入
+      if (saveModel)
+        model.save(savePath)
+
+      model
+    }
+
+    val newDataFrame = wvModel
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .transform(data)
+    new OnlyOneDFOutput(newDataFrame)
+  }
+
+  override protected def paramsValid(): Boolean = true
+}
+
+
+class StopWordsRmv(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): OnlyOneDFOutput = {
+    import org.apache.spark.ml.feature.StopWordsRemover
+
+    val inputCol = getParams[String](StopWordsRemoverParamsName.inputCol)
+    val outputCol = getParams[String](StopWordsRemoverParamsName.outputCol)
+    val caseSensitive = getParamsOrElse[Boolean](StopWordsRemoverParamsName.caseSensitive, false)
+    val stopWords = getParams[Array[String]](StopWordsRemoverParamsName.stopWords) // 可以手动、或者选择英语或汉语
+    // 英语：StopWords.English
+    // 汉语：
+    val newDataFrame = new StopWordsRemover()
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol).setCaseSensitive(caseSensitive)
+      .setStopWords(stopWords) // 停用词 StopWords.English
+      .transform(data)
+
+    new OnlyOneDFOutput(newDataFrame)
+
+  }
+}
+
+class NGramMD(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): OnlyOneDFOutput = {
+    import org.apache.spark.ml.feature.NGram
+
+    val inputCol = getParams[String](NGramParamsName.inputCol)
+    val outputCol = getParams[String](NGramParamsName.outputCol)
+    val n = getParamsOrElse[Int](NGramParamsName.n, 3)
+
+    val newDataFrame = new NGram()
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .setN(n)
+      .transform(data)
+    new OnlyOneDFOutput(newDataFrame)
+  }
+}
+
+class Discretizer(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+
+  def checkFrameSize(boxesNum: Long): Boolean = {
+    val akkaFrameSize = util.Try(
+      data.sqlContext.sparkContext.getConf.getSizeAsMb("spark.akka.frameSize")).toOption
+    if (akkaFrameSize.isDefined) {
+      val size = (1 << 17).toLong * akkaFrameSize.get // 17 = 20 - 3, a double = 2^3 Bytes
+      size > boxesNum
+    } else {
+      println("没有获得akka.frameSize的参数，未能判断等深或自定义的分箱边界是否超过结点间传输限制。")
+      true
+    }
+  }
+
+  override protected def runAlgorithm(): OnlyOneDFOutput = {
+
+    val inputCol = getParams[String](DiscretizerParams.inputCol)
+    val outputCol = getParams[String](DiscretizerParams.outputCol)
+    val discretizeFormat = getParams[String](DiscretizerParams.discretizeFormat)
+
+    // 分为等宽[byWidth]、等深[byDepth]、自定义[selfDefined]
+
+    discretizeFormat match {
+      case "byWidth" =>
+        val phase = getParams[Double](DiscretizerParams.phase)
+        val width = getParams[Double](DiscretizerParams.width)
+        require(width > 0, "等宽分箱宽度需要大于0")
+
+        import org.apache.spark.sql.NullableFunctions.udf
+        import org.apache.spark.sql.functions.col
+        val binningByWidth = udf((d: Double) => scala.math.floor((d - phase) / width))
+        new OnlyOneDFOutput(data.withColumn(outputCol, binningByWidth(col(inputCol))))
+
+      case "byDepth" =>
+        import org.apache.spark.ml.feature.QuantileDiscretizer
+        val depth = getParamsOrElse[Double](DiscretizerParams.depth, Double.NaN)
+        val boxesNum = getParamsOrElse[Double](DiscretizerParams.boxesNum, Double.NaN)
+        if (boxesNum.isNaN ^ depth.isNaN)
+          throw new Exception("等宽分箱中，深度和箱子数需要且只能设置一个。")
+
+        if (!boxesNum.isNaN) {
+          checkFrameSize(boxesNum.toLong)
+
+          val newDataFrame = new QuantileDiscretizer()
+            .setInputCol(inputCol)
+            .setOutputCol(outputCol)
+            .setNumBuckets(boxesNum.toInt)
+            .fit(data)
+            .transform(data)
+          new OnlyOneDFOutput(newDataFrame)
+
+        } else {
+          val boxesNum = scala.math.round(data.count() / depth.toDouble)
+          checkFrameSize(boxesNum)
+
+          val newDataFrame = new QuantileDiscretizer()
+            .setInputCol(inputCol)
+            .setOutputCol(outputCol)
+            .setNumBuckets(boxesNum.toInt)
+            .fit(data)
+            .transform(data)
+          new OnlyOneDFOutput(newDataFrame)
+        }
+
+      case "selfDefined" =>
+        import org.apache.spark.ml.feature.Bucketizer
+        val buckets = getParams[Array[Double]](DiscretizerParams.buckets)
+
+        val newDataFrame = new Bucketizer()
+          .setInputCol(inputCol)
+          .setOutputCol(outputCol)
+          .setSplits(buckets).transform(data)
+
+        new OnlyOneDFOutput(newDataFrame)
+    }
+
+  }
+}
+
+
 case class ParamInfo(name: String,
                      annotation: String) // 参数判断写在类外面了
 
@@ -235,8 +467,8 @@ object CountWordVectorParamsName extends ParamsName {
 
   /** if [[loadModel]] == 否：需要进一步的训练信息如下 */
   val trainData = ParamInfo("trainData", "训练数据")
-  val trainInputCol = ParamInfo("trainInputCol", "词汇数")
-  val trainOutputCol = ParamInfo("trainOutputCol", "词汇数")
+  val trainInputCol = ParamInfo("trainInputCol", "训练数据列名")
+  val trainOutputCol = ParamInfo("trainOutputCol", "训练数据输出列名")
   val vocabSize = ParamInfo("VocabSize", "词汇数")
   val minDf = ParamInfo("minDf", "最小文档频率")
   val minTf = ParamInfo("minTf", "最小词频")
@@ -247,6 +479,66 @@ object CountWordVectorParamsName extends ParamsName {
 
 
 }
+
+
+object HashTFParamsName extends ParamsName {
+
+  val numFeatures = ParamInfo("numFeatures", "词汇数")
+
+}
+
+
+object WordToVectorParamsName extends ParamsName {
+  val loadModel = ParamInfo("loadModel", "是否从持久化引擎中获取词频模型") // 是/否
+  /** if [[loadModel]] == 是：需要进一步的训练信息如下 */
+  val loadPath = ParamInfo("loadPath", "模型读取路径") // end if
+
+  /** if [[loadModel]] == 否：需要进一步的训练信息如下 */
+  val trainData = ParamInfo("trainData", "训练数据")
+  val trainInputCol = ParamInfo("trainInputCol", "训练数据列名")
+  val trainOutputCol = ParamInfo("trainOutputCol", "训练数据输出列名")
+  val vocabSize = ParamInfo("VocabSize", "词汇数")
+  val minCount = ParamInfo("minCount", "最小词频")
+  val windowSize = ParamInfo("windowSize", "gram宽度")
+  val stepSize = ParamInfo("stepSize", "步长")
+  val numPartitions = ParamInfo("numPartitions", "并行度")
+  val numIterations = ParamInfo("numIterations", "执行次数")
+  val seed = ParamInfo("seed", "随机数种子")
+
+
+  /** 是否保存新训练的模型 */
+  val saveModel = ParamInfo("saveModel", "是否将模型保存到持久化引擎中") // 是/否
+  /** if[[saveModel]] == 是 */
+  val savePath = ParamInfo("savePath", "模型保存路径") // end if // end if
+
+}
+
+
+object StopWordsRemoverParamsName extends ParamsName {
+  val caseSensitive = ParamInfo("caseSensitive", "是否区分大小写")
+  val stopWords = ParamInfo("numIterations", "停用词") // 这里严格接受Array[String]类型的停用词，选择英语汉语停用词典放在外层
+}
+
+
+object NGramParamsName extends ParamsName {
+  val n = ParamInfo("n", "gram数值")
+}
+
+
+object DiscretizerParams extends ParamsName {
+  val discretizeFormat = ParamInfo("discretizeFormat", "离散化模式") // 分为等宽[byWidth]、等深[byDepth]、自定义[selfDefined]
+
+  val phase = ParamInfo("phase", "周期初始相位——某个箱子的起始数值") // if discretizeFormat == byWidth
+  val width = ParamInfo("width", "箱子宽度") // if discretizeFormat == byWidth
+
+  val depth = ParamInfo("depth", "深度") // if discretizeFormat == byDepth  --和boxesNum之间二选一
+  val boxesNum = ParamInfo("boxesNum", "箱子数") // if discretizeFormat == byDepth
+
+  val buckets = ParamInfo("buckets", "分箱边界") // if discretizeFormat == byDepth
+
+}
+
+
 
 
 

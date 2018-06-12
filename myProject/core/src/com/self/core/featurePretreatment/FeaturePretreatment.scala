@@ -1,7 +1,8 @@
 package com.self.core.featurePretreatment
 
 import com.self.core.baseApp.myAPP
-import com.self.core.featurePretreatment.models.{CountWordVector, CountWordVectorParamsName, TokenizerByRegex, TokenizerByRegexParamsName}
+import com.self.core.featurePretreatment.models._
+import org.apache.spark.ml.feature.Tokenizer
 import org.apache.spark.sql.DataFrame
 
 
@@ -22,6 +23,13 @@ object FeaturePretreatment extends myAPP {
 
     val inputCol = "sentence"
     val outputCol = "sentenceOut"
+
+
+    val data1 = {
+      val tokenizer = new Tokenizer().setInputCol("sentence").setOutputCol("words")
+      val wordsData = tokenizer.transform(data)
+      wordsData // label, words -- Seq[String]
+    }
   }
 
   object data2 {
@@ -53,6 +61,26 @@ object FeaturePretreatment extends myAPP {
     val outputCol = "sentenceOut"
   }
 
+  object data4 {
+    val data: DataFrame = sqlc.createDataFrame(Seq(
+      (0, Seq("I", "saw", "the", "red", "baloon")),
+      (1, Seq("Mary", "had", "a", "little", "lamb"))
+    )).toDF("id", "raw")
+
+  }
+
+  object data5 {
+    val wordDataFrame: DataFrame = sqlc.createDataFrame(Seq(
+      (0, Array("Hi", "I", "heard", "about", "Spark")),
+      (1, Array("I", "wish", "Java", "could", "use", "case", "classes")),
+      (2, Array("Logistic", "regression", "models", "are", "neat"))
+    )).toDF("label", "words")
+
+    val inputCol = "words"
+  }
+
+
+  /** 一、属性类型特征提取 */
   /** 1.正则表达式分词 */
   def test1() = {
     val testData = data1
@@ -105,6 +133,119 @@ object FeaturePretreatment extends myAPP {
   }
 
 
+  /** 3.hash词频统计 */
+  def test3() = {
+
+    import com.self.core.featurePretreatment.models.{HashTF, HashTFParamsName}
+
+    val sentenceData = data1.data1
+    val numFeature = 10000 // 在由string转过来的时候需要判断一下是否越界
+    val inputCol = "words"
+    val outputCol = "wordsOutput"
+
+
+    val newDataFrame = new HashTF(sentenceData).setParams(HashTFParamsName.numFeatures, numFeature)
+      .setParams(HashTFParamsName.inputCol, inputCol)
+      .setParams(HashTFParamsName.outputCol, outputCol)
+      .run()
+
+    newDataFrame.outputData.show()
+
+  }
+
+
+  /** 4.Word2Vector */
+  def test4() = {
+    val rawDataFrame = data1.data1
+    rawDataFrame.show()
+
+    import com.self.core.featurePretreatment.models.{WordToVector, WordToVectorParamsName}
+
+    val newDataFrame = new WordToVector(rawDataFrame)
+      .setParams(WordToVectorParamsName.inputCol, "words")
+      .setParams(WordToVectorParamsName.outputCol, "wordsOutput")
+      .setParams(WordToVectorParamsName.windowSize, 5)
+      .setParams(WordToVectorParamsName.vocabSize, 1000)
+      .setParams(WordToVectorParamsName.stepSize, 0.1)
+      //      .setParams(WordToVectorParamsName.trainData, rawDataFrame)
+      //      .setParams(WordToVectorParamsName.trainInputCol, "") // 在内部中会验证是否在trainData中
+      //      .setParams(WordToVectorParamsName.trainOutputCol, "") // 没有就不要写，否则训练找不到
+      .setParams(WordToVectorParamsName.minCount, 1)
+      .setParams(WordToVectorParamsName.numPartitions, 1)
+      .setParams(WordToVectorParamsName.numIterations, 10)
+      .setParams(WordToVectorParamsName.loadModel, false)
+      .setParams(WordToVectorParamsName.loadPath, "")
+      .setParams(WordToVectorParamsName.saveModel, false)
+      .setParams(WordToVectorParamsName.savePath, "")
+      .run()
+      .outputData
+
+    newDataFrame.show()
+
+    println(newDataFrame.select("wordsOutput").collect().head.getAs[org.apache.spark.mllib.linalg.Vector](0).size)
+
+  }
+
+
+  /** 5. */
+  def test5() = {
+    import com.self.core.featurePretreatment.models.{StopWordsRmv, StopWordsRemoverParamsName}
+    import com.self.core.featurePretreatment.models.StopWordsUtils
+
+    val stopWordsFormat = "English" // "chinese", "byHand", "byFile"
+
+    val stopWords = stopWordsFormat match {
+      case "English" => StopWordsUtils.English
+      case "Chinese" => StopWordsUtils.chinese
+      case "byHand" => Array("", "")
+      case "byFile" =>
+        val path = "/data/dfe"
+        val separator = ","
+        sc.textFile(path).collect().flatMap(_.split(separator).map(_.trim))
+    }
+
+    val rawDataFrame = data4.data
+    val newDataFrame = new StopWordsRmv(rawDataFrame)
+      .setParams(StopWordsRemoverParamsName.inputCol, "raw")
+      .setParams(StopWordsRemoverParamsName.outputCol, "rawOutput")
+      .setParams(StopWordsRemoverParamsName.caseSensitive, false)
+      .setParams(StopWordsRemoverParamsName.stopWords, stopWords)
+      .run().outputData
+    newDataFrame.show()
+    println(StopWordsUtils.English.length)
+
+
+  }
+
+  def test6() = {
+    /** n-gram */
+    import com.self.core.featurePretreatment.models.{NGramMD, NGramParamsName}
+
+    val rawDataFrame = data5.wordDataFrame
+    val inputCol = data5.inputCol
+
+    val newDataFrame = new NGramMD(rawDataFrame)
+      .setParams(NGramParamsName.inputCol, inputCol)
+      .setParams(NGramParamsName.outputCol, "wordsOutput")
+      .setParams(NGramParamsName.n, 3)
+      .run()
+      .outputData
+    newDataFrame.show()
+
+  }
+
+
+
+  /** 二、数值类型特征提取 */
+  def test7() = {
+
+
+
+
+  }
+
+
+
   override def run(): Unit = {
     /** 一些基本的参数设定和平台的变量 */
     //    val jsonParam = "<#jsonparam#>"
@@ -117,11 +258,25 @@ object FeaturePretreatment extends myAPP {
     //    val rawDataFrame = z1.rdd(tableName).asInstanceOf[DataFrame]
 
 
-//    test1()
+    //    test1()
 
-//    test2()
+    //    test2()
+
+    //    test3()
+
+    //    test4()
+
+    //    test5()
+
+    //    test6()
 
 
+    println(sc.getConf.getOption("spark.akka.frameSize").isDefined)
+
+    println(true ^ false)
+    println(false ^ true)
+    println(true ^ true)
+    println(false ^ false)
 
 
   }

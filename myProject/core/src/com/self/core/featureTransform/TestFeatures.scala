@@ -495,9 +495,9 @@ object TestFeatures extends myAPP {
   override def run(): Unit = {
     /** 1.特征提取 */
     /** 1-1 tf-idf转换 */
-    //    feature11() //
+        feature11() //
     /** 1-2  Word2Vec */
-    //    feature12()
+        feature12()
 
     /** 1-3 正则分词器 */
     //    feature13()
@@ -638,6 +638,7 @@ object TestFeatures extends myAPP {
 //    println(getCar(car1)) // 类型恰当
 //    println(getCar(volvo1)) // compile， 需要Item[+A]中Volvo转为了父类型Car，子类Volvo向上兼容为基类Car，发生了协变
 //
+
 
 
   }
