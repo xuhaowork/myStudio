@@ -79,6 +79,59 @@ object FeaturePretreatment extends myAPP {
     val inputCol = "words"
   }
 
+  object data6 {
+    val data: DataFrame = sqlc.createDataFrame(
+      Array((0, 18.0), (1, 19.0), (2, 8.0), (3, 5.0), (4, 2.2))
+    ).toDF("id", "hour")
+  }
+
+  object data7 {
+    val data: DataFrame = {
+      import com.self.core.featurePretreatment.models.{Discretizer, DiscretizerParams}
+      val rawDataFrame = data6.data
+
+      new Discretizer(rawDataFrame)
+        .setParams(DiscretizerParams.inputCol, "hour")
+        .setParams(DiscretizerParams.outputCol, "outputCol")
+        .setParams(DiscretizerParams.discretizeFormat, "byWidth")
+        .setParams(DiscretizerParams.phase, 0.0)
+        .setParams(DiscretizerParams.width, 3.0)
+        .run()
+        .data
+    }
+  }
+
+
+  object data8 {
+
+    import org.apache.spark.mllib.linalg.Vectors
+
+    val data: DataFrame = {
+      sqlc.createDataFrame(
+        Array(
+          Vectors.dense(2.0, 1.0),
+          Vectors.dense(0.0, 3.0),
+          Vectors.dense(0.0, -3.0),
+          Vectors.dense(2.0, 2.0)).map(Tuple1.apply)
+      ).toDF("features")
+    }
+
+  }
+
+  object data9 {
+
+    import org.apache.spark.mllib.linalg.Vectors
+
+    val data: DataFrame = sqlc.createDataFrame(
+      Array(
+        Vectors.sparse(5, Seq((1, 1.0), (3, 7.0))),
+        Vectors.dense(2.0, 0.0, 3.0, 4.0, 5.0),
+        Vectors.dense(4.0, 0.0, 0.0, 6.0, 7.0)
+      ).map(Tuple1.apply)
+    ).toDF("pcaFeature")
+
+  }
+
 
   /** 一、属性类型特征提取 */
   /** 1.正则表达式分词 */
@@ -100,7 +153,7 @@ object FeaturePretreatment extends myAPP {
       .setParams(TokenizerByRegexParamsName.toLowerCase, false)
       .setParams(TokenizerByRegexParamsName.pattern, pattern)
       .run()
-      .outputData
+      .data
 
     println(newDataFrame.schema)
     newDataFrame.show()
@@ -127,7 +180,7 @@ object FeaturePretreatment extends myAPP {
       .setParams(CountWordVectorParamsName.minDf, 1.0)
       .setParams(CountWordVectorParamsName.savePath, "/data/wordCount/...")
       .run()
-      .outputData
+      .data
 
     newDataFrame.show()
   }
@@ -144,13 +197,14 @@ object FeaturePretreatment extends myAPP {
     val outputCol = "wordsOutput"
 
 
-    val newDataFrame = new HashTF(sentenceData).setParams(HashTFParamsName.numFeatures, numFeature)
+    val newDataFrame = new HashTF(sentenceData)
+      .setParams(HashTFParamsName.numFeatures, numFeature)
       .setParams(HashTFParamsName.inputCol, inputCol)
       .setParams(HashTFParamsName.outputCol, outputCol)
       .run()
 
-    newDataFrame.outputData.show()
-
+    newDataFrame.data.show()
+    newDataFrame.data
   }
 
 
@@ -178,7 +232,7 @@ object FeaturePretreatment extends myAPP {
       .setParams(WordToVectorParamsName.saveModel, false)
       .setParams(WordToVectorParamsName.savePath, "")
       .run()
-      .outputData
+      .data
 
     newDataFrame.show()
 
@@ -189,8 +243,7 @@ object FeaturePretreatment extends myAPP {
 
   /** 5. */
   def test5() = {
-    import com.self.core.featurePretreatment.models.{StopWordsRmv, StopWordsRemoverParamsName}
-    import com.self.core.featurePretreatment.models.StopWordsUtils
+    import com.self.core.featurePretreatment.models.{StopWordsRemoverParamsName, StopWordsRmv, StopWordsUtils}
 
     val stopWordsFormat = "English" // "chinese", "byHand", "byFile"
 
@@ -210,7 +263,7 @@ object FeaturePretreatment extends myAPP {
       .setParams(StopWordsRemoverParamsName.outputCol, "rawOutput")
       .setParams(StopWordsRemoverParamsName.caseSensitive, false)
       .setParams(StopWordsRemoverParamsName.stopWords, stopWords)
-      .run().outputData
+      .run().data
     newDataFrame.show()
     println(StopWordsUtils.English.length)
 
@@ -229,21 +282,165 @@ object FeaturePretreatment extends myAPP {
       .setParams(NGramParamsName.outputCol, "wordsOutput")
       .setParams(NGramParamsName.n, 3)
       .run()
-      .outputData
+      .data
     newDataFrame.show()
 
   }
 
 
-
   /** 二、数值类型特征提取 */
   def test7() = {
+    import com.self.core.featurePretreatment.models.{Discretizer, DiscretizerParams}
+    val rawDataFrame = data6.data
 
+    val byWidthDF = new Discretizer(rawDataFrame)
+      .setParams(DiscretizerParams.inputCol, "hour")
+      .setParams(DiscretizerParams.outputCol, "outputCol")
+      .setParams(DiscretizerParams.discretizeFormat, "byWidth")
+      .setParams(DiscretizerParams.phase, 0.0)
+      .setParams(DiscretizerParams.width, 4.0)
+      .run()
+      .data
 
+    byWidthDF.show()
 
+    val byDepthDF = new Discretizer(rawDataFrame)
+      .setParams(DiscretizerParams.inputCol, "hour")
+      .setParams(DiscretizerParams.outputCol, "outputCol")
+      .setParams(DiscretizerParams.discretizeFormat, "byDepth")
+      .setParams(DiscretizerParams.depth, 2.0) // @todo 必须是Double，否则java.lang.Integer cannot be cast to java.lang.Double
+      .run()
+      .data
+
+    byDepthDF.show()
+
+    val byDepthDF2 = new Discretizer(rawDataFrame)
+      .setParams(DiscretizerParams.inputCol, "hour")
+      .setParams(DiscretizerParams.outputCol, "outputCol")
+      .setParams(DiscretizerParams.discretizeFormat, "byDepth")
+      .setParams(DiscretizerParams.boxesNum, 4.0) // @todo 必须是Double，否则java.lang.Integer cannot be cast to java.lang.Double
+      .run()
+      .data
+
+    byDepthDF2.show()
+
+    val byDepthDF3 = new Discretizer(rawDataFrame)
+      .setParams(DiscretizerParams.inputCol, "hour")
+      .setParams(DiscretizerParams.outputCol, "outputCol")
+      .setParams(DiscretizerParams.discretizeFormat, "selfDefined")
+      .setParams(DiscretizerParams.buckets, Array(3.0, 9.0, 5.0))
+      .setParams(DiscretizerParams.bucketsAddInfinity, true)
+      .run()
+      .data
+
+    byDepthDF3.show()
 
   }
 
+
+  def test8() = {
+    val rawDataFrame = data7.data
+    rawDataFrame.show()
+
+
+    import com.self.core.featurePretreatment.models.{OneHotCoder, OneHotCoderParams}
+
+    val newDataFrame = new OneHotCoder(rawDataFrame)
+      .setParams(OneHotCoderParams.inputCol, "outputCol")
+      .setParams(OneHotCoderParams.outputCol, "oneHot")
+      .setParams(OneHotCoderParams.dropLast, true)
+      .run()
+      .data
+
+    newDataFrame.show()
+
+    newDataFrame.select("oneHot").rdd
+      .map(_.get(0).asInstanceOf[org.apache.spark.mllib.linalg.Vector])
+      .collect()
+      .foreach(println)
+
+  }
+
+
+  def test9() = {
+    import com.self.core.featurePretreatment.models.{IDFTransformer, IDFTransformerParams}
+    val rawDataFrame = test3()
+
+    val inputCol = "wordsOutput"
+
+    rawDataFrame.select(inputCol).rdd
+      .map(_.get(0).asInstanceOf[org.apache.spark.mllib.linalg.Vector])
+      .collect()
+      .foreach(println)
+
+    val outputCol = "idfCol"
+    val newDataFrame = new IDFTransformer(rawDataFrame)
+      .setParams(IDFTransformerParams.inputCol, inputCol)
+      .setParams(IDFTransformerParams.outputCol, outputCol)
+      .setParams(IDFTransformerParams.loadModel, false)
+      .setParams(IDFTransformerParams.minDocFreq, 1) // @todo: 必须为Int
+      .setParams(IDFTransformerParams.saveModel, false)
+      .run()
+      .data
+
+    newDataFrame.select(outputCol).rdd
+      .map(_.get(0).asInstanceOf[org.apache.spark.mllib.linalg.Vector])
+      .collect()
+      .foreach(println)
+    newDataFrame
+  }
+
+  def test10() = {
+    import com.self.core.featurePretreatment.models.{VectorIndexerParams, VectorIndexerTransformer}
+
+    val rawDataFrame = data8.data
+
+    rawDataFrame.show()
+
+    val newDataFrame = new VectorIndexerTransformer(rawDataFrame)
+      .setParams(VectorIndexerParams.inputCol, "features")
+      .setParams(VectorIndexerParams.outputCol, "outPut")
+      .setParams(VectorIndexerParams.loadModel, false)
+      .setParams(VectorIndexerParams.maxCategories, 2) // @todo
+      .setParams(VectorIndexerParams.loadModel, false)
+      .run()
+      .data
+
+    newDataFrame.show()
+
+  }
+
+
+  def test11() = {
+    import com.self.core.featurePretreatment.models.{PCAParams, PCATransformer}
+    val rawDataFrame = data9.data
+    val inputCol = "pcaFeature"
+    rawDataFrame.show()
+    val newDataFrame = new PCATransformer(rawDataFrame)
+      .setParams(PCAParams.inputCol, inputCol)
+      .setParams(PCAParams.outputCol, "output")
+      .setParams(PCAParams.loadModel, false)
+      .setParams(PCAParams.saveModel, false)
+      .setParams(PCAParams.p, 2) // 需要小于向量长度
+      .run()
+      .data
+    newDataFrame.show()
+  }
+
+  def test12() = {
+    import com.self.core.featurePretreatment.models.{PlynExpansionParams, PlynExpansionTransformer}
+    val rawDataFrame = data9.data
+    val inputCol = "pcaFeature"
+    rawDataFrame.show()
+
+    val newDataFrame = new PlynExpansionTransformer(rawDataFrame)
+      .setParams(PlynExpansionParams.inputCol, inputCol)
+      .setParams(PlynExpansionParams.outputCol, "output")
+      .setParams(PlynExpansionParams.degree, 3)
+      .run()
+      .data
+    newDataFrame.show()
+  }
 
 
   override def run(): Unit = {
@@ -270,13 +467,25 @@ object FeaturePretreatment extends myAPP {
 
     //    test6()
 
+    //    test7()
 
-    println(sc.getConf.getOption("spark.akka.frameSize").isDefined)
+    //    test8()
 
-    println(true ^ false)
-    println(false ^ true)
-    println(true ^ true)
-    println(false ^ false)
+    //    test9()
+
+    //    test10()
+
+    //    test11()
+
+    test12()
+
+
+    //    println(sc.getConf.getOption("spark.akka.frameSize").isDefined)
+    //
+    //    println(true ^ false)
+    //    println(false ^ true)
+    //    println(true ^ true)
+    //    println(false ^ false)
 
 
   }

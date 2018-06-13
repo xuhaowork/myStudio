@@ -115,10 +115,10 @@ abstract class Pretreater[M <: PretreatmentOutput](val data: DataFrame) {
 /**
   * 正则表达式分词
   */
-class TokenizerByRegex(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+class TokenizerByRegex(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
   override protected def paramsValid(): Boolean = true
 
-  override protected def runAlgorithm(): OnlyOneDFOutput = {
+  override protected def runAlgorithm(): UnaryOutput = {
     import org.apache.spark.ml.feature.RegexTokenizer
 
     val inputCol = getParams[String](TokenizerByRegexParamsName.inputCol)
@@ -141,16 +141,16 @@ class TokenizerByRegex(override val data: DataFrame) extends Pretreater[OnlyOneD
       case e: Exception => throw new Exception("正则表达式分词转换过程中出现异常，" +
         s"请检查是否是正则表达式或者一些参数发生了错误，${e.getMessage}")
     }
-    new OnlyOneDFOutput(wordsData)
+    new UnaryOutput(wordsData)
   }
 }
 
 
-class CountWordVector(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+class CountWordVector(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
   /** 2-2 向量计数器 */
   override protected def paramsValid(): Boolean = true
 
-  override protected def runAlgorithm(): OnlyOneDFOutput = {
+  override protected def runAlgorithm(): UnaryOutput = {
 
     import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel}
 
@@ -196,13 +196,13 @@ class CountWordVector(override val data: DataFrame) extends Pretreater[OnlyOneDF
       .setOutputCol(outputCol)
       .setMinTF(minTf)
       .transform(data)
-    new OnlyOneDFOutput(newDataFrame)
+    new UnaryOutput(newDataFrame)
   }
 
 }
 
 
-class HashTF(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+class HashTF(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
 
   import org.apache.spark.ml.feature.HashingTF
 
@@ -214,7 +214,7 @@ class HashTF(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](d
     *
     * @return 输出一个PretreatmentOutput的实现子类型
     */
-  override protected def runAlgorithm(): OnlyOneDFOutput = {
+  override protected def runAlgorithm(): UnaryOutput = {
 
 
     val inputCol = getParams[String](HashTFParamsName.inputCol)
@@ -226,15 +226,15 @@ class HashTF(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](d
       .setOutputCol(outputCol)
       .setNumFeatures(numFeatures)
       .transform(data)
-    new OnlyOneDFOutput(tfDataFrame)
+    new UnaryOutput(tfDataFrame)
   }
 
 }
 
 
-class WordToVector(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+class WordToVector(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
 
-  override protected def runAlgorithm(): OnlyOneDFOutput = {
+  override protected def runAlgorithm(): UnaryOutput = {
     import org.apache.spark.ml.feature.{Word2Vec, Word2VecModel}
 
     val inputCol = getParams[String](WordToVectorParamsName.inputCol) // 这个需要在模型中再设置一次
@@ -288,14 +288,14 @@ class WordToVector(override val data: DataFrame) extends Pretreater[OnlyOneDFOut
       .setInputCol(inputCol)
       .setOutputCol(outputCol)
       .transform(data)
-    new OnlyOneDFOutput(newDataFrame)
+    new UnaryOutput(newDataFrame)
   }
 
   override protected def paramsValid(): Boolean = true
 }
 
 
-class StopWordsRmv(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+class StopWordsRmv(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
   override protected def paramsValid(): Boolean = true
 
   /**
@@ -303,7 +303,7 @@ class StopWordsRmv(override val data: DataFrame) extends Pretreater[OnlyOneDFOut
     *
     * @return 输出一个PretreatmentOutput的实现子类型
     */
-  override protected def runAlgorithm(): OnlyOneDFOutput = {
+  override protected def runAlgorithm(): UnaryOutput = {
     import org.apache.spark.ml.feature.StopWordsRemover
 
     val inputCol = getParams[String](StopWordsRemoverParamsName.inputCol)
@@ -318,12 +318,12 @@ class StopWordsRmv(override val data: DataFrame) extends Pretreater[OnlyOneDFOut
       .setStopWords(stopWords) // 停用词 StopWords.English
       .transform(data)
 
-    new OnlyOneDFOutput(newDataFrame)
+    new UnaryOutput(newDataFrame)
 
   }
 }
 
-class NGramMD(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+class NGramMD(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
   override protected def paramsValid(): Boolean = true
 
   /**
@@ -331,7 +331,7 @@ class NGramMD(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](
     *
     * @return 输出一个PretreatmentOutput的实现子类型
     */
-  override protected def runAlgorithm(): OnlyOneDFOutput = {
+  override protected def runAlgorithm(): UnaryOutput = {
     import org.apache.spark.ml.feature.NGram
 
     val inputCol = getParams[String](NGramParamsName.inputCol)
@@ -343,11 +343,11 @@ class NGramMD(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](
       .setOutputCol(outputCol)
       .setN(n)
       .transform(data)
-    new OnlyOneDFOutput(newDataFrame)
+    new UnaryOutput(newDataFrame)
   }
 }
 
-class Discretizer(override val data: DataFrame) extends Pretreater[OnlyOneDFOutput](data) {
+class Discretizer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
   override protected def paramsValid(): Boolean = true
 
   /**
@@ -368,7 +368,7 @@ class Discretizer(override val data: DataFrame) extends Pretreater[OnlyOneDFOutp
     }
   }
 
-  override protected def runAlgorithm(): OnlyOneDFOutput = {
+  override protected def runAlgorithm(): UnaryOutput = {
 
     val inputCol = getParams[String](DiscretizerParams.inputCol)
     val outputCol = getParams[String](DiscretizerParams.outputCol)
@@ -385,17 +385,17 @@ class Discretizer(override val data: DataFrame) extends Pretreater[OnlyOneDFOutp
         import org.apache.spark.sql.NullableFunctions.udf
         import org.apache.spark.sql.functions.col
         val binningByWidth = udf((d: Double) => scala.math.floor((d - phase) / width))
-        new OnlyOneDFOutput(data.withColumn(outputCol, binningByWidth(col(inputCol))))
+        new UnaryOutput(data.withColumn(outputCol, binningByWidth(col(inputCol))))
 
       case "byDepth" =>
         import org.apache.spark.ml.feature.QuantileDiscretizer
         val depth = getParamsOrElse[Double](DiscretizerParams.depth, Double.NaN)
         val boxesNum = getParamsOrElse[Double](DiscretizerParams.boxesNum, Double.NaN)
-        if (boxesNum.isNaN ^ depth.isNaN)
-          throw new Exception("等宽分箱中，深度和箱子数需要且只能设置一个。")
+
+        require(boxesNum.isNaN ^ depth.isNaN, "等宽分箱中，深度和箱子数需要且只能设置一个。")
 
         if (!boxesNum.isNaN) {
-          checkFrameSize(boxesNum.toLong)
+          require(checkFrameSize(boxesNum.toLong), "箱子数目过多, 导致其边界信息超过了spark.akka.frame.size的上界")
 
           val newDataFrame = new QuantileDiscretizer()
             .setInputCol(inputCol)
@@ -403,11 +403,13 @@ class Discretizer(override val data: DataFrame) extends Pretreater[OnlyOneDFOutp
             .setNumBuckets(boxesNum.toInt)
             .fit(data)
             .transform(data)
-          new OnlyOneDFOutput(newDataFrame)
+          new UnaryOutput(newDataFrame)
 
         } else {
-          val boxesNum = scala.math.round(data.count() / depth.toDouble)
-          checkFrameSize(boxesNum)
+          val dfCount = data.count()
+          val boxesNum = scala.math.round(dfCount / depth.toDouble)
+          require(boxesNum > 1, s"分箱数至少是2，你设置的深度可能过大，深度不应该超过当前数据总数$dfCount，否则只能分一个箱子")
+          require(checkFrameSize(boxesNum), "箱子数目过多, 导致其边界信息超过了spark.akka.frame.size的上界")
 
           val newDataFrame = new QuantileDiscretizer()
             .setInputCol(inputCol)
@@ -415,27 +417,229 @@ class Discretizer(override val data: DataFrame) extends Pretreater[OnlyOneDFOutp
             .setNumBuckets(boxesNum.toInt)
             .fit(data)
             .transform(data)
-          new OnlyOneDFOutput(newDataFrame)
+          new UnaryOutput(newDataFrame)
         }
 
       case "selfDefined" =>
         import org.apache.spark.ml.feature.Bucketizer
-        val buckets = getParams[Array[Double]](DiscretizerParams.buckets)
+
+        val bucketsAddInfinity = getParamsOrElse[Boolean](DiscretizerParams.bucketsAddInfinity, false)
+        val buckets = if (bucketsAddInfinity) {
+          Double.MinValue +: getParams[Array[Double]](DiscretizerParams.buckets).sorted :+ Double.MaxValue
+        } else {
+          getParams[Array[Double]](DiscretizerParams.buckets).sorted :+ Double.MaxValue
+        }
 
         val newDataFrame = new Bucketizer()
           .setInputCol(inputCol)
           .setOutputCol(outputCol)
-          .setSplits(buckets).transform(data)
+          .setSplits(buckets)
+          .transform(data)
 
-        new OnlyOneDFOutput(newDataFrame)
+        new UnaryOutput(newDataFrame)
     }
 
   }
 }
 
 
-case class ParamInfo(name: String,
-                     annotation: String) // 参数判断写在类外面了
+class OneHotCoder(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.ml.feature.OneHotEncoder
+
+    val inputCol = getParams[String](OneHotCoderParams.inputCol)
+    val outputCol = getParams[String](OneHotCoderParams.outputCol)
+    val dropLast = getParamsOrElse[Boolean](OneHotCoderParams.dropLast, false)
+
+    val newDataFrame = new OneHotEncoder()
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .setDropLast(dropLast)
+      .transform(data)
+
+    new UnaryOutput(newDataFrame)
+
+  }
+}
+
+class IDFTransformer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    /** 2-3 tf-idf转换 */
+    import org.apache.spark.ml.feature.{IDF, IDFModel}
+
+    val inputCol = getParams[String](IDFTransformerParams.inputCol)
+    val outputCol = getParams[String](IDFTransformerParams.outputCol)
+    val loadModel = getParamsOrElse[Boolean](IDFTransformerParams.loadModel, false)
+
+    val idfModel = if (loadModel) {
+      val loadPath = getParams[String](IDFTransformerParams.loadPath)
+      IDFModel.load(loadPath)
+    } else {
+      val trainData = getParamsOrElse[DataFrame](IDFTransformerParams.trainData, data)
+      val trainInputCol = getParamsOrElse[String](IDFTransformerParams.trainInputCol, inputCol)
+      val trainOutputCol = getParamsOrElse[String](IDFTransformerParams.trainOutputCol, outputCol)
+      val minDocFreq = getParamsOrElse[Int](IDFTransformerParams.minDocFreq, 0)
+
+      val idf = new IDF()
+        .setInputCol(trainInputCol)
+        .setOutputCol(trainOutputCol)
+        .setMinDocFreq(minDocFreq) // 最低统计词频
+      val model = idf.fit(trainData)
+
+      val saveModel = getParamsOrElse[Boolean](IDFTransformerParams.saveModel, false)
+      if (saveModel) {
+        val savePath = getParams[String](IDFTransformerParams.savePath)
+        model.save(savePath)
+      }
+      model
+    }
+
+    val newDataFrame = idfModel.setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .transform(data)
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
+/** 低变异性数值特征转类别特征 */
+class VectorIndexerTransformer(override val data: DataFrame) extends Pretreater[BinaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): BinaryOutput = {
+    import org.apache.spark.ml.feature.{VectorIndexer, VectorIndexerModel}
+
+    val inputCol = getParams[String](VectorIndexerParams.inputCol)
+    val outputCol = getParams[String](VectorIndexerParams.outputCol)
+    val loadModel = getParamsOrElse[Boolean](VectorIndexerParams.loadModel, false)
+
+    val viModel = if (loadModel) {
+      val loadPath = getParams[String](VectorIndexerParams.loadPath)
+      VectorIndexerModel.load(loadPath)
+    } else {
+      val trainData = getParamsOrElse[DataFrame](VectorIndexerParams.trainData, data)
+      val trainInputCol = getParamsOrElse[String](VectorIndexerParams.trainInputCol, inputCol)
+      val trainOutputCol = getParamsOrElse[String](VectorIndexerParams.trainOutputCol, outputCol)
+
+      val maxCategories = getParamsOrElse[Int](VectorIndexerParams.maxCategories, 20)
+      val model = new VectorIndexer()
+        .setInputCol(trainInputCol)
+        .setOutputCol(trainOutputCol)
+        .setMaxCategories(maxCategories)
+        .fit(trainData)
+
+      val saveModel = getParamsOrElse[Boolean](IDFTransformerParams.saveModel, false)
+      if (saveModel) {
+        val savePath = getParams[String](IDFTransformerParams.savePath)
+        model.save(savePath)
+      }
+      model
+    }
+
+    val categoricalFeatures: Map[Int, Map[Double, Int]] = viModel.setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .categoryMaps
+    val newDataFrame = viModel.setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .transform(data)
+
+    val categoryInfo = new CategoryInfoForVectorIndex(categoricalFeatures)
+    new BinaryOutput(newDataFrame, categoryInfo)
+  }
+}
+
+
+class PCATransformer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.ml.feature.{PCA, PCAModel}
+
+    val inputCol = getParams[String](PCAParams.inputCol)
+    val outputCol = getParams[String](PCAParams.outputCol)
+    val loadModel = getParamsOrElse[Boolean](PCAParams.loadModel, false)
+
+    val pcaModel = if (loadModel) {
+      val loadPath = getParams[String](PCAParams.loadPath)
+      PCAModel.load(loadPath)
+    } else {
+      val trainData = getParamsOrElse[DataFrame](PCAParams.trainData, data)
+      val trainInputCol = getParamsOrElse[String](PCAParams.trainInputCol, inputCol)
+      val trainOutputCol = getParamsOrElse[String](PCAParams.trainOutputCol, outputCol)
+      val p = getParams[Int](PCAParams.p)
+
+      val model = new PCA()
+        .setInputCol(trainInputCol)
+        .setOutputCol(trainOutputCol)
+        .setK(p)
+        .fit(trainData)
+
+      val saveModel = getParamsOrElse[Boolean](IDFTransformerParams.saveModel, false)
+      if (saveModel) {
+        val savePath = getParams[String](IDFTransformerParams.savePath)
+        model.save(savePath)
+      }
+      model
+    }
+
+    val newDataFrame = pcaModel.setInputCol(inputCol).setOutputCol(outputCol).transform(data)
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
+class PlynExpansionTransformer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.ml.feature.PolynomialExpansion
+
+    val inputCol = getParams[String](PlynExpansionParams.inputCol)
+    val outputCol = getParams[String](PlynExpansionParams.outputCol)
+    val degree = getParams[Int](PlynExpansionParams.degree)
+
+    val newDataFrame = new PolynomialExpansion()
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .setDegree(degree)
+      .transform(data)
+
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
+case class ParamInfo(name: String, annotation: String) // 参数判断写在类外面了
 
 class ParamsName {
   /** 输入列名 */
@@ -443,6 +647,23 @@ class ParamsName {
 
   /** 输出列名 */
   val outputCol = ParamInfo("outputCol", "输出列名")
+}
+
+
+class ParamsNameFromSavableModel extends ParamsName {
+  val loadModel = ParamInfo("loadModel", "是否从持久化引擎中获取词频模型") // 是/否
+  /** if [[loadModel]] == 是：需要进一步的训练信息如下 */
+  val loadPath = ParamInfo("loadPath", "模型读取路径") // end if
+
+  /** if [[loadModel]] == 否：需要进一步的训练信息如下 */
+  val trainData = ParamInfo("trainData", "训练数据")
+  val trainInputCol = ParamInfo("trainInputCol", "训练数据列名")
+  val trainOutputCol = ParamInfo("trainOutputCol", "训练数据输出列名")
+  /** 是否保存新训练的模型 */
+  val saveModel = ParamInfo("saveModel", "是否将模型保存到持久化引擎中") // 是/否
+  /** if[[saveModel]] == 是 */
+  val savePath = ParamInfo("savePath", "模型保存路径") // end if // end if
+
 }
 
 
@@ -476,7 +697,6 @@ object CountWordVectorParamsName extends ParamsName {
   val saveModel = ParamInfo("saveModel", "是否将模型保存到持久化引擎中") // 是/否
   /** if[[saveModel]] == 是 */
   val savePath = ParamInfo("savePath", "模型保存路径") // end if // end if
-
 
 }
 
@@ -535,8 +755,34 @@ object DiscretizerParams extends ParamsName {
   val boxesNum = ParamInfo("boxesNum", "箱子数") // if discretizeFormat == byDepth
 
   val buckets = ParamInfo("buckets", "分箱边界") // if discretizeFormat == byDepth
+  val bucketsAddInfinity = ParamInfo("bucketsAddInfinity", "是否以极小值作为分箱边界的一部分") // if discretizeFormat == byDepth
 
 }
+
+object OneHotCoderParams extends ParamsName {
+  val dropLast = ParamInfo("dropLast", "是否去掉最后一个index")
+
+}
+
+object IDFTransformerParams extends ParamsNameFromSavableModel {
+  val minDocFreq = ParamInfo("minDocFreq", "最低文档频率") // 当某个数据出现的文档数（记录数）低于该值时会被过滤掉。
+}
+
+object VectorIndexerParams extends ParamsNameFromSavableModel {
+
+  val maxCategories = ParamInfo("maxCategories", "离散型特征频次阈值")
+}
+
+object PCAParams extends ParamsNameFromSavableModel {
+
+  val p = ParamInfo("p", "PCA的主成分数")
+}
+
+object PlynExpansionParams extends ParamsName {
+  val degree = ParamInfo("degree", "展开式的幂")
+}
+
+
 
 
 
