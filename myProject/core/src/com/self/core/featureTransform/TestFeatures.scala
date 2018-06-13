@@ -225,7 +225,7 @@ object TestFeatures extends myAPP {
 
     val indexer = new StringIndexer()
       .setInputCol("category")
-      .setOutputCol("categoryIndex")
+      .setOutputCol("categoryIndex").setHandleInvalid()
 
     val indexed = indexer.fit(df1).transform(df2)
     indexed.show()

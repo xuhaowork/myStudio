@@ -639,6 +639,32 @@ class PlynExpansionTransformer(override val data: DataFrame) extends Pretreater[
 }
 
 
+class DCTTransformer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.ml.feature.DCT
+
+    val inputCol = getParams[String](DCTParams.inputCol)
+    val outputCol = getParams[String](DCTParams.outputCol)
+    val inverse = getParamsOrElse[Boolean](DCTParams.inverse, false)
+
+    val newDataFrame = new DCT()
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .setInverse(inverse)
+      .transform(data)
+
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
 case class ParamInfo(name: String, annotation: String) // 参数判断写在类外面了
 
 class ParamsName {
@@ -780,6 +806,11 @@ object PCAParams extends ParamsNameFromSavableModel {
 
 object PlynExpansionParams extends ParamsName {
   val degree = ParamInfo("degree", "展开式的幂")
+}
+
+
+object DCTParams extends ParamsName {
+  val inverse = ParamInfo("inverse", "展开式的幂")
 }
 
 

@@ -130,6 +130,15 @@ object FeaturePretreatment extends myAPP {
       ).map(Tuple1.apply)
     ).toDF("pcaFeature")
 
+
+    val data2: DataFrame = sqlc.createDataFrame(
+      Array(
+        Vectors.sparse(7, Seq((1, 1.0), (3, 7.0))),
+        Vectors.dense(2.0, 0.0, 3.0, 4.0),
+        Vectors.dense(4.0, 0.0, 0.0, 6.0, 7.0)
+      ).map(Tuple1.apply)
+    ).toDF("pcaFeature")
+
   }
 
 
@@ -362,7 +371,7 @@ object FeaturePretreatment extends myAPP {
   }
 
 
-  def test9() = {
+  def test9(): DataFrame = {
     import com.self.core.featurePretreatment.models.{IDFTransformer, IDFTransformerParams}
     val rawDataFrame = test3()
 
@@ -411,7 +420,7 @@ object FeaturePretreatment extends myAPP {
   }
 
 
-  def test11() = {
+  def test11(): Unit = {
     import com.self.core.featurePretreatment.models.{PCAParams, PCATransformer}
     val rawDataFrame = data9.data
     val inputCol = "pcaFeature"
@@ -427,9 +436,9 @@ object FeaturePretreatment extends myAPP {
     newDataFrame.show()
   }
 
-  def test12() = {
+  def test12(): Unit = {
     import com.self.core.featurePretreatment.models.{PlynExpansionParams, PlynExpansionTransformer}
-    val rawDataFrame = data9.data
+    val rawDataFrame = data9.data2
     val inputCol = "pcaFeature"
     rawDataFrame.show()
 
@@ -440,6 +449,24 @@ object FeaturePretreatment extends myAPP {
       .run()
       .data
     newDataFrame.show()
+  }
+
+  def test13() = {
+    import com.self.core.featurePretreatment.models.{DCTTransformer, DCTParams}
+    val rawDataFrame = data9.data2
+    val inputCol = "pcaFeature"
+    val outputCol = "outputCol"
+    val inverse = false
+
+    val newDataFrame = new DCTTransformer(rawDataFrame)
+      .setParams(DCTParams.inputCol, inputCol)
+      .setParams(DCTParams.outputCol, outputCol)
+      .setParams(DCTParams.inverse, inverse)
+      .run()
+      .data
+
+    newDataFrame.show()
+
   }
 
 
@@ -477,7 +504,12 @@ object FeaturePretreatment extends myAPP {
 
     //    test11()
 
-    test12()
+    //    test12()
+
+    test13()
+
+
+
 
 
     //    println(sc.getConf.getOption("spark.akka.frameSize").isDefined)
