@@ -51,6 +51,7 @@ class BinaryOutput(override val data: DataFrame,
   */
 class CategoryInfoForVectorIndex(val categoricalFeatures: Map[Int, Map[Double, Int]]) extends AuxiliaryInfo
 
+
 /**
   * 有附加信息的输出
   *

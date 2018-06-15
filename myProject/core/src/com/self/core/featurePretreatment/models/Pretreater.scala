@@ -1,6 +1,7 @@
 package com.self.core.featurePretreatment.models
 
 
+import org.apache.spark.ml.feature.StringIndexerModel
 import org.apache.spark.sql.DataFrame
 
 import scala.reflect.ClassTag
@@ -665,6 +666,117 @@ class DCTTransformer(override val data: DataFrame) extends Pretreater[UnaryOutpu
 }
 
 
+class StringIndexTransformer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.ml.feature.StringIndexer
+
+    val inputCol = getParams[String](StringIndexParams.inputCol)
+    val outputCol = getParams[String](StringIndexParams.outputCol)
+    val loadModel = getParamsOrElse[Boolean](StringIndexParams.loadModel, false)
+
+    val stringVectorModel: StringIndexerModel = if (loadModel) {
+      val loadPath = getParams[String](StringIndexParams.loadPath)
+      StringIndexerModel.load(loadPath)
+    } else {
+      val trainData = getParamsOrElse[DataFrame](StringIndexParams.trainData, data)
+      val trainInputCol = getParamsOrElse[String](StringIndexParams.trainInputCol, inputCol)
+      val trainOutputCol = getParamsOrElse[String](StringIndexParams.trainOutputCol, outputCol)
+
+      val model = new StringIndexer()
+        .setInputCol(trainInputCol)
+        .setOutputCol(trainOutputCol)
+        .setHandleInvalid("skip") // Array("skip", "error"))
+        .fit(trainData)
+
+      val saveModel = getParamsOrElse[Boolean](StringIndexParams.saveModel, false)
+      if (saveModel) {
+        val savePath = getParams[String](StringIndexParams.savePath)
+        model.save(savePath)
+      }
+      model
+    }
+    val handleInvalid = getParamsOrElse[String](StringIndexParams.handleInvalid, "skip")
+
+    import org.apache.spark.sql.functions.col
+
+    val newData = try {
+      data.withColumn(inputCol, col(inputCol).cast("double"))
+    } catch {
+      case e: Exception => throw new Exception(s"您输入的数据列${inputCol}不能转为double类型，${e.getMessage}")
+    }
+
+    val newDataFrame = stringVectorModel
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .setHandleInvalid(handleInvalid)
+      .transform(newData)
+
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
+class IndexerStringTransformer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.ml.feature.IndexToString
+
+    val inputCol = getParams[String](IndexToStringParams.inputCol)
+    val outputCol = getParams[String](IndexToStringParams.outputCol)
+    val loadModel = getParamsOrElse[Boolean](IndexToStringParams.loadModel, false)
+
+    val indexToString: IndexToString = if (loadModel) {
+      val loadPath = getParams[String](IndexToStringParams.loadPath)
+      IndexToString.load(loadPath)
+    } else {
+      val trainInputCol = getParamsOrElse[String](IndexToStringParams.trainInputCol, inputCol)
+      val trainOutputCol = getParamsOrElse[String](IndexToStringParams.trainOutputCol, outputCol)
+      val labels = getParams[Array[String]](IndexToStringParams.labels)
+
+      val model = new IndexToString()
+        .setInputCol(trainInputCol)
+        .setOutputCol(trainOutputCol)
+        .setLabels(labels)
+
+
+      val saveModel = getParamsOrElse[Boolean](StringIndexParams.saveModel, false)
+      if (saveModel) {
+        val savePath = getParams[String](StringIndexParams.savePath)
+        model.save(savePath)
+      }
+      model
+    }
+
+    val newData = try {
+      data.filter(s"$inputCol < ${indexToString.getLabels.length}")
+    } catch {
+      case e: Exception => throw new Exception(s"数据过滤中失败，" +
+        s"请检查${inputCol}是否存在或者类型是否是double类型，${e.getMessage}")
+    }
+
+    val newDataFrame = indexToString
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .transform(newData)
+
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
 case class ParamInfo(name: String, annotation: String) // 参数判断写在类外面了
 
 class ParamsName {
@@ -811,6 +923,16 @@ object PlynExpansionParams extends ParamsName {
 
 object DCTParams extends ParamsName {
   val inverse = ParamInfo("inverse", "展开式的幂")
+}
+
+
+object StringIndexParams extends ParamsNameFromSavableModel {
+  val handleInvalid = ParamInfo("handleInvalid", "怎样处理匹配不上的数据")
+}
+
+
+object IndexToStringParams extends ParamsNameFromSavableModel {
+  val labels = ParamInfo("labels", "转换标签")
 }
 
 

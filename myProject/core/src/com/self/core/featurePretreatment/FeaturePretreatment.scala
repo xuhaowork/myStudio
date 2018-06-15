@@ -141,6 +141,19 @@ object FeaturePretreatment extends myAPP {
 
   }
 
+  object data10 {
+    val data: DataFrame = sqlc.createDataFrame(Seq(
+      (0, "a"),
+      (1, "b"),
+      (2, "c"),
+      (3, "a"),
+      (4, "a"),
+      (5, "c")
+    )).toDF("id", "category")
+
+    val inputCol: String = "category"
+  }
+
 
   /** 一、属性类型特征提取 */
   /** 1.正则表达式分词 */
@@ -452,7 +465,7 @@ object FeaturePretreatment extends myAPP {
   }
 
   def test13() = {
-    import com.self.core.featurePretreatment.models.{DCTTransformer, DCTParams}
+    import com.self.core.featurePretreatment.models.{DCTParams, DCTTransformer}
     val rawDataFrame = data9.data2
     val inputCol = "pcaFeature"
     val outputCol = "outputCol"
@@ -467,6 +480,44 @@ object FeaturePretreatment extends myAPP {
 
     newDataFrame.show()
 
+  }
+
+
+  def test14() = {
+    import com.self.core.featurePretreatment.models.{StringIndexParams, StringIndexTransformer}
+
+    val rawDataFrame = data10.data
+    val inputCol = data10.inputCol
+    val loadModel = false
+
+    val newDataFrame = new StringIndexTransformer(rawDataFrame)
+      .setParams(StringIndexParams.inputCol, inputCol)
+      .setParams(StringIndexParams.outputCol, "outputCol")
+      .setParams(StringIndexParams.loadModel, loadModel)
+      .setParams(StringIndexParams.handleInvalid, "skip")
+      .run()
+      .data
+
+    newDataFrame.show()
+
+  }
+
+
+  def test15() = {
+    import com.self.core.featurePretreatment.models.{IndexToStringParams, IndexerStringTransformer}
+
+    val rawDataFrame = data10.data
+    val inputCol = "id"
+
+    val newDataFrame = new IndexerStringTransformer(rawDataFrame)
+      .setParams(IndexToStringParams.inputCol, inputCol)
+      .setParams(IndexToStringParams.outputCol, "outputCol")
+      .setParams(IndexToStringParams.saveModel, false)
+      .setParams(IndexToStringParams.labels, Array("a", "b", "c", "d", "e"))
+      .run()
+      .data
+
+    newDataFrame.show()
   }
 
 
@@ -506,7 +557,12 @@ object FeaturePretreatment extends myAPP {
 
     //    test12()
 
-    test13()
+    //    test13()
+
+    test14()
+
+
+    test15()
 
 
 

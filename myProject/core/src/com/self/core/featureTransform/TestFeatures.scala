@@ -225,7 +225,7 @@ object TestFeatures extends myAPP {
 
     val indexer = new StringIndexer()
       .setInputCol("category")
-      .setOutputCol("categoryIndex").setHandleInvalid()
+      .setOutputCol("categoryIndex")
 
     val indexed = indexer.fit(df1).transform(df2)
     indexed.show()
@@ -481,7 +481,8 @@ object TestFeatures extends myAPP {
     df.show()
 
     val selector = new ChiSqSelector()
-      .setFeaturesCol("features").setNumTopFeatures(2)
+      .setFeaturesCol("features")
+      .setNumTopFeatures(2)
       .setLabelCol("clicked")
       .setOutputCol("selectedFeatures")
 
