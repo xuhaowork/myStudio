@@ -3,7 +3,8 @@ package com.self.core.featureTransform
 
 import com.self.core.baseApp.myAPP
 import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.sql.{DataFrame, Row}
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.sql.{DataFrame, NullableFunctions, Row}
 import org.apache.spark.sql.functions.{col, substring}
 import org.apache.spark.sql.types.{DoubleType, StringType, StructField}
 
@@ -48,7 +49,7 @@ object TestFeatures extends myAPP {
     val word2Vec = new Word2Vec()
       .setInputCol("text")
       .setOutputCol("result")
-      .setVectorSize(3)
+      .setVectorSize(3).setWindowSize(2)
       .setMinCount(0)
     val model = word2Vec.fit(documentDF)
     val result = model.transform(documentDF)
@@ -467,27 +468,26 @@ object TestFeatures extends myAPP {
   }
 
   def feature31() = {
-    import org.apache.spark.ml.feature.ChiSqSelector
-    import org.apache.spark.mllib.linalg.Vectors
+//    import org.apache.spark.ml.feature.ChiSqSelector
+    import org.apache.spark.mllib.linalg.{Vector, Vectors}
 
+    import org.apache.spark.mllib.feature.{ChiSqSelector, ChiSqSelectorModel}
     val data = Seq(
       (7, Vectors.dense(0.0, 0.0, 18.0, 1.0), 1.0),
       (8, Vectors.dense(0.0, 1.0, 12.0, 0.0), 0.0),
       (9, Vectors.dense(1.0, 0.0, 15.0, 0.1), 0.0)
     )
-
     val df = sqlc.createDataFrame(data).toDF("id", "features", "clicked")
 
-    df.show()
+    val chiSqModel = new ChiSqSelector(2).fit(df.select("clicked", "features").na.drop("any").rdd.map(row => {
+      val label = row.get(0).asInstanceOf[Double]
+      val features = row.getAs[Vector](1)
+      LabeledPoint(label, features)
+    }))
 
-    val selector = new ChiSqSelector()
-      .setFeaturesCol("features")
-      .setNumTopFeatures(2)
-      .setLabelCol("clicked")
-      .setOutputCol("selectedFeatures")
+    val transformUDF = NullableFunctions.udf((v: Vector) => chiSqModel.transform(v))
 
-    val result = selector.fit(df).transform(df)
-    result.show()
+    df.withColumn("outputCol", transformUDF(col("features"))).show()
 
   }
 
@@ -496,9 +496,9 @@ object TestFeatures extends myAPP {
   override def run(): Unit = {
     /** 1.特征提取 */
     /** 1-1 tf-idf转换 */
-        feature11() //
+//        feature11() //
     /** 1-2  Word2Vec */
-        feature12()
+//        feature12()
 
     /** 1-3 正则分词器 */
     //    feature13()
@@ -549,13 +549,13 @@ object TestFeatures extends myAPP {
 //    feature28()
 
     /** 1-19 分箱 */
-    feature29()
+//    feature29()
 
     /** 1-20 取子向量 */
 //    feature30()
 
     /** 1-21 卡方特征选择 */
-//    feature31()
+    feature31()
 
 
 

@@ -1,8 +1,8 @@
 package com.self.core.featurePretreatment.models
 
-
-import org.apache.spark.ml.feature.StringIndexerModel
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.mllib.regression.LabeledPoint
+import org.apache.spark.sql.functions.col
+import org.apache.spark.sql.{DataFrame, NullableFunctions}
 
 import scala.reflect.ClassTag
 
@@ -94,7 +94,7 @@ abstract class Pretreater[M <: PretreatmentOutput](val data: DataFrame) {
     * [输出函数run()]
     *
     * @return 输出一个PretreatmentOutput的实现子类型
-    * @see [[com.self.core.featurePretreatment.models.PretreatmentOutput]]
+    * @see [[com.zzjz.deepinsight.core.featurePretreatment.models.PretreatmentOutput]]
     *      里面至少有一个输出的DataFrame，还可能有一个额外的输出信息。
     */
   final def run(): M = {
@@ -125,7 +125,6 @@ class TokenizerByRegex(override val data: DataFrame) extends Pretreater[UnaryOut
     val inputCol = getParams[String](TokenizerByRegexParamsName.inputCol)
     val outputCol = getParams[String](TokenizerByRegexParamsName.outputCol)
     val gaps = getParamsOrElse[Boolean](TokenizerByRegexParamsName.gaps, true)
-    val toLowerCase = getParamsOrElse[Boolean](TokenizerByRegexParamsName.toLowerCase, false)
     val pattern = getParamsOrElse[String](TokenizerByRegexParamsName.pattern, "\\s+")
     val minTokenLength = getParamsOrElse[Int](TokenizerByRegexParamsName.minTokenLength, 0)
 
@@ -133,7 +132,6 @@ class TokenizerByRegex(override val data: DataFrame) extends Pretreater[UnaryOut
       .setInputCol(inputCol)
       .setOutputCol(outputCol)
       .setGaps(gaps)
-      .setToLowercase(toLowerCase)
       .setPattern(pattern)
       .setMinTokenLength(minTokenLength)
     val wordsData = try {
@@ -153,49 +151,45 @@ class CountWordVector(override val data: DataFrame) extends Pretreater[UnaryOutp
 
   override protected def runAlgorithm(): UnaryOutput = {
 
-    import org.apache.spark.ml.feature.{CountVectorizer, CountVectorizerModel}
+    import org.apache.spark.ml.feature.CountVectorizer
 
     val inputCol = getParams[String](CountWordVectorParamsName.inputCol)
     val outputCol = getParams[String](CountWordVectorParamsName.outputCol)
-    val loadModel = getParamsOrElse[Boolean](CountWordVectorParamsName.loadModel, false)
+    //    val loadModel = getParamsOrElse[Boolean](CountWordVectorParamsName.loadModel, false)
+    //
+    //    val cvModel = if (loadModel) {
+    //      val loadPath = getParams[String](CountWordVectorParamsName.loadPath)
+    //      CountVectorizerModel.load(loadPath)
+    //    } else {
+    //    val trainData = getParamsOrElse[DataFrame](CountWordVectorParamsName.trainData, data) // 如果不输入默认训练数据就是预测数据
+    //
+    //    val trainInputCol = getParamsOrElse[String](CountWordVectorParamsName.trainInputCol,
+    //      CountWordVectorParamsName.inputCol.name) // 如果不输入默认训练数据就是预测数据
+    //
+    //    val trainOutputCol = getParamsOrElse[String](CountWordVectorParamsName.trainOutputCol,
+    //      CountWordVectorParamsName.outputCol.name) // 如果不输入默认训练数据就是预测数据
 
-    val cvModel = if (loadModel) {
-      val loadPath = getParams[String](CountWordVectorParamsName.loadPath)
-      CountVectorizerModel.load(loadPath)
-    } else {
-      val trainData = getParamsOrElse[DataFrame](CountWordVectorParamsName.trainData, data) // 如果不输入默认训练数据就是预测数据
+    val vocabSize = getParamsOrElse[Int](CountWordVectorParamsName.vocabSize, 1 << 18) // 默认 2^18
+    val minDf = getParamsOrElse[Double](CountWordVectorParamsName.minDf, 1.0) // 默认1.0
+    val minTf = getParamsOrElse[Double](CountWordVectorParamsName.minTf, 1.0) // 默认1.0 这里会设置一次，因为可能持久化
 
-      val trainInputCol = getParamsOrElse[String](CountWordVectorParamsName.trainInputCol,
-        CountWordVectorParamsName.inputCol.name) // 如果不输入默认训练数据就是预测数据
-
-      val trainOutputCol = getParamsOrElse[String](CountWordVectorParamsName.trainOutputCol,
-        CountWordVectorParamsName.outputCol.name) // 如果不输入默认训练数据就是预测数据
-
-      val vocabSize = getParamsOrElse[Int](CountWordVectorParamsName.vocabSize, 1 << 18) // 默认 2^18
-      val minDf = getParamsOrElse[Double](CountWordVectorParamsName.minDf, 1.0) // 默认1.0
-      val minTf = getParamsOrElse[Double](CountWordVectorParamsName.minTf, 1.0) // 默认1.0 这里会设置一次，因为可能持久化
-
-      val model = new CountVectorizer()
-        .setInputCol(trainInputCol)
-        .setOutputCol(trainOutputCol)
-        .setVocabSize(vocabSize)
-        .setMinDF(minDf)
-        .setMinTF(minTf)
-        .fit(trainData)
-
-      val saveModel = getParamsOrElse[Boolean](CountWordVectorParamsName.saveModel, false) // 默认不保存
-      val savePath = getParams[String](CountWordVectorParamsName.savePath) // if 保存 --必须输入
-      if (saveModel)
-        model.save(savePath)
-
-      model
-    }
-
-    val minTf = getParams[Double](CountWordVectorParamsName.minTf)
-    val newDataFrame = cvModel
+    val model = new CountVectorizer()
       .setInputCol(inputCol)
       .setOutputCol(outputCol)
+      .setVocabSize(vocabSize)
+      .setMinDF(minDf)
       .setMinTF(minTf)
+      .fit(data)
+
+    //      val saveModel = getParamsOrElse[Boolean](CountWordVectorParamsName.saveModel, false) // 默认不保存
+    //      val savePath = getParams[String](CountWordVectorParamsName.savePath) // if 保存 --必须输入
+    //      if (saveModel)
+    //        model.save(savePath)
+    //
+    //      model
+    //    }
+
+    val newDataFrame = model
       .transform(data)
     new UnaryOutput(newDataFrame)
   }
@@ -236,56 +230,56 @@ class HashTF(override val data: DataFrame) extends Pretreater[UnaryOutput](data)
 class WordToVector(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
 
   override protected def runAlgorithm(): UnaryOutput = {
-    import org.apache.spark.ml.feature.{Word2Vec, Word2VecModel}
+    import org.apache.spark.ml.feature.Word2Vec
 
     val inputCol = getParams[String](WordToVectorParamsName.inputCol) // 这个需要在模型中再设置一次
     val outputCol = getParams[String](WordToVectorParamsName.outputCol)
-    val loadModel = getParamsOrElse[Boolean](WordToVectorParamsName.loadModel, false)
+    //    val loadModel = getParamsOrElse[Boolean](WordToVectorParamsName.loadModel, false)
+    //
+    //    val wvModel = if (loadModel) {
+    //      val loadPath = getParams[String](WordToVectorParamsName.loadPath)
+    //      Word2VecModel.load(loadPath)
+    //    } else {
+    val trainData = getParamsOrElse[DataFrame](WordToVectorParamsName.trainData, data)
+    // 如果不输入默认训练数据就是预测数据
 
-    val wvModel = if (loadModel) {
-      val loadPath = getParams[String](WordToVectorParamsName.loadPath)
-      Word2VecModel.load(loadPath)
-    } else {
-      val trainData = getParamsOrElse[DataFrame](WordToVectorParamsName.trainData, data)
-      // 如果不输入默认训练数据就是预测数据
+    val trainInputCol = getParamsOrElse[String](WordToVectorParamsName.trainInputCol,
+      inputCol) // 如果不输入默认训练数据就是预测数据
 
-      val trainInputCol = getParamsOrElse[String](WordToVectorParamsName.trainInputCol,
-        inputCol) // 如果不输入默认训练数据就是预测数据
+    val trainOutputCol = getParamsOrElse[String](WordToVectorParamsName.trainOutputCol,
+      outputCol) // 如果不输入默认训练数据就是预测数据
 
-      val trainOutputCol = getParamsOrElse[String](WordToVectorParamsName.trainOutputCol,
-        outputCol) // 如果不输入默认训练数据就是预测数据
+    val rdSeed = new java.util.Random().nextLong()
 
-      val rdSeed = new java.util.Random().nextLong()
+    val vocabSize = getParamsOrElse[Int](WordToVectorParamsName.vocabSize, 1 << 18) // 默认 2^18
+    //      val windowSize = getParamsOrElse[Int](WordToVectorParamsName.windowSize, 5) // 默认1.0
+    val stepSize = getParamsOrElse[Double](WordToVectorParamsName.stepSize, 0.025) // 默认1.0 这里会设置一次，因为可能持久化
+    val numPartitions = getParamsOrElse[Int](WordToVectorParamsName.numPartitions, 1) // 默认1.0 这里会设置一次，因为可能持久化
+    val numIterations = getParamsOrElse[Int](WordToVectorParamsName.numIterations, 1) // 默认1.0 这里会设置一次，因为可能持久化
+    val minCount = getParamsOrElse[Int](WordToVectorParamsName.minCount, 5)
+    val seed = getParamsOrElse[Long](WordToVectorParamsName.seed, rdSeed)
 
-      val vocabSize = getParamsOrElse[Int](WordToVectorParamsName.vocabSize, 1 << 18) // 默认 2^18
-      val windowSize = getParamsOrElse[Int](WordToVectorParamsName.windowSize, 5) // 默认1.0
-      val stepSize = getParamsOrElse[Double](WordToVectorParamsName.stepSize, 0.025) // 默认1.0 这里会设置一次，因为可能持久化
-      val numPartitions = getParamsOrElse[Int](WordToVectorParamsName.numPartitions, 1) // 默认1.0 这里会设置一次，因为可能持久化
-      val numIterations = getParamsOrElse[Int](WordToVectorParamsName.numIterations, 1) // 默认1.0 这里会设置一次，因为可能持久化
-      val minCount = getParamsOrElse[Int](WordToVectorParamsName.minCount, 5)
-      val seed = getParamsOrElse[Long](WordToVectorParamsName.seed, rdSeed)
+    val model = new Word2Vec()
+      .setInputCol(trainInputCol)
+      .setOutputCol(trainOutputCol)
+      .setVectorSize(vocabSize)
+      .setMinCount(minCount)
+      .setMaxIter(numIterations)
+      //        .setWindowSize(windowSize)
+      .setSeed(seed)
+      .setNumPartitions(numPartitions)
+      .setStepSize(stepSize)
+      .fit(trainData)
 
-      val model = new Word2Vec()
-        .setInputCol(trainInputCol)
-        .setOutputCol(trainOutputCol)
-        .setVectorSize(vocabSize)
-        .setMinCount(minCount)
-        .setMaxIter(numIterations)
-        .setWindowSize(windowSize)
-        .setSeed(seed)
-        .setNumPartitions(numPartitions)
-        .setStepSize(stepSize)
-        .fit(trainData)
+    //      val saveModel = getParamsOrElse[Boolean](WordToVectorParamsName.saveModel, false) // 默认不保存
+    //      val savePath = getParamsOrElse[String](WordToVectorParamsName.savePath, "/data/wordToVectorModel/") // if 保存 --必须输入
+    //      if (saveModel)
+    //        model.save(savePath)
+    //
+    //      model
+    //    }
 
-      val saveModel = getParamsOrElse[Boolean](WordToVectorParamsName.saveModel, false) // 默认不保存
-      val savePath = getParamsOrElse[String](WordToVectorParamsName.savePath, "/data/wordToVectorModel/") // if 保存 --必须输入
-      if (saveModel)
-        model.save(savePath)
-
-      model
-    }
-
-    val newDataFrame = wvModel
+    val newDataFrame = model
       .setInputCol(inputCol)
       .setOutputCol(outputCol)
       .transform(data)
@@ -388,38 +382,38 @@ class Discretizer(override val data: DataFrame) extends Pretreater[UnaryOutput](
         val binningByWidth = udf((d: Double) => scala.math.floor((d - phase) / width))
         new UnaryOutput(data.withColumn(outputCol, binningByWidth(col(inputCol))))
 
-      case "byDepth" =>
-        import org.apache.spark.ml.feature.QuantileDiscretizer
-        val depth = getParamsOrElse[Double](DiscretizerParams.depth, Double.NaN)
-        val boxesNum = getParamsOrElse[Double](DiscretizerParams.boxesNum, Double.NaN)
-
-        require(boxesNum.isNaN ^ depth.isNaN, "等宽分箱中，深度和箱子数需要且只能设置一个。")
-
-        if (!boxesNum.isNaN) {
-          require(checkFrameSize(boxesNum.toLong), "箱子数目过多, 导致其边界信息超过了spark.akka.frame.size的上界")
-
-          val newDataFrame = new QuantileDiscretizer()
-            .setInputCol(inputCol)
-            .setOutputCol(outputCol)
-            .setNumBuckets(boxesNum.toInt)
-            .fit(data)
-            .transform(data)
-          new UnaryOutput(newDataFrame)
-
-        } else {
-          val dfCount = data.count()
-          val boxesNum = scala.math.round(dfCount / depth.toDouble)
-          require(boxesNum > 1, s"分箱数至少是2，你设置的深度可能过大，深度不应该超过当前数据总数$dfCount，否则只能分一个箱子")
-          require(checkFrameSize(boxesNum), "箱子数目过多, 导致其边界信息超过了spark.akka.frame.size的上界")
-
-          val newDataFrame = new QuantileDiscretizer()
-            .setInputCol(inputCol)
-            .setOutputCol(outputCol)
-            .setNumBuckets(boxesNum.toInt)
-            .fit(data)
-            .transform(data)
-          new UnaryOutput(newDataFrame)
-        }
+      //      case "byDepth" =>
+      //        import org.apache.spark.ml.feature.QuantileDiscretizer
+      //        val depth = getParamsOrElse[Double](DiscretizerParams.depth, Double.NaN)
+      //        val boxesNum = getParamsOrElse[Double](DiscretizerParams.boxesNum, Double.NaN)
+      //
+      //        require(boxesNum.isNaN ^ depth.isNaN, "等宽分箱中，深度和箱子数需要且只能设置一个。")
+      //
+      //        if (!boxesNum.isNaN) {
+      //          require(checkFrameSize(boxesNum.toLong), "箱子数目过多, 导致其边界信息超过了spark.akka.frame.size的上界")
+      //
+      //          val newDataFrame = new QuantileDiscretizer()
+      //            .setInputCol(inputCol)
+      //            .setOutputCol(outputCol)
+      //            .setNumBuckets(boxesNum.toInt)
+      //            .fit(data)
+      //            .transform(data)
+      //          new UnaryOutput(newDataFrame)
+      //
+      //        } else {
+      //          val dfCount = data.count()
+      //          val boxesNum = scala.math.round(dfCount / depth.toDouble)
+      //          require(boxesNum > 1, s"分箱数至少是2，你设置的深度可能过大，深度不应该超过当前数据总数$dfCount，否则只能分一个箱子")
+      //          require(checkFrameSize(boxesNum), "箱子数目过多, 导致其边界信息超过了spark.akka.frame.size的上界")
+      //
+      //          val newDataFrame = new QuantileDiscretizer()
+      //            .setInputCol(inputCol)
+      //            .setOutputCol(outputCol)
+      //            .setNumBuckets(boxesNum.toInt)
+      //            .fit(data)
+      //            .transform(data)
+      //          new UnaryOutput(newDataFrame)
+      //        }
 
       case "selfDefined" =>
         import org.apache.spark.ml.feature.Bucketizer
@@ -481,36 +475,36 @@ class IDFTransformer(override val data: DataFrame) extends Pretreater[UnaryOutpu
     */
   override protected def runAlgorithm(): UnaryOutput = {
     /** 2-3 tf-idf转换 */
-    import org.apache.spark.ml.feature.{IDF, IDFModel}
+    import org.apache.spark.ml.feature.IDF
 
     val inputCol = getParams[String](IDFTransformerParams.inputCol)
     val outputCol = getParams[String](IDFTransformerParams.outputCol)
     val loadModel = getParamsOrElse[Boolean](IDFTransformerParams.loadModel, false)
 
-    val idfModel = if (loadModel) {
-      val loadPath = getParams[String](IDFTransformerParams.loadPath)
-      IDFModel.load(loadPath)
-    } else {
-      val trainData = getParamsOrElse[DataFrame](IDFTransformerParams.trainData, data)
-      val trainInputCol = getParamsOrElse[String](IDFTransformerParams.trainInputCol, inputCol)
-      val trainOutputCol = getParamsOrElse[String](IDFTransformerParams.trainOutputCol, outputCol)
-      val minDocFreq = getParamsOrElse[Int](IDFTransformerParams.minDocFreq, 0)
+    //    val idfModel = if (loadModel) {
+    //      val loadPath = getParams[String](IDFTransformerParams.loadPath)
+    //      IDFModel.load(loadPath)
+    //    } else {
+    val trainData = getParamsOrElse[DataFrame](IDFTransformerParams.trainData, data)
+    val trainInputCol = getParamsOrElse[String](IDFTransformerParams.trainInputCol, inputCol)
+    val trainOutputCol = getParamsOrElse[String](IDFTransformerParams.trainOutputCol, outputCol)
+    val minDocFreq = getParamsOrElse[Int](IDFTransformerParams.minDocFreq, 0)
 
-      val idf = new IDF()
-        .setInputCol(trainInputCol)
-        .setOutputCol(trainOutputCol)
-        .setMinDocFreq(minDocFreq) // 最低统计词频
-      val model = idf.fit(trainData)
+    val idf = new IDF()
+      .setInputCol(trainInputCol)
+      .setOutputCol(trainOutputCol)
+      .setMinDocFreq(minDocFreq) // 最低统计词频
+    val model = idf.fit(trainData)
 
-      val saveModel = getParamsOrElse[Boolean](IDFTransformerParams.saveModel, false)
-      if (saveModel) {
-        val savePath = getParams[String](IDFTransformerParams.savePath)
-        model.save(savePath)
-      }
-      model
-    }
+    //      val saveModel = getParamsOrElse[Boolean](IDFTransformerParams.saveModel, false)
+    //      if (saveModel) {
+    //        val savePath = getParams[String](IDFTransformerParams.savePath)
+    //        model.save(savePath)
+    //      }
+    //      model
+    //    }
 
-    val newDataFrame = idfModel.setInputCol(inputCol)
+    val newDataFrame = model.setInputCol(inputCol)
       .setOutputCol(outputCol)
       .transform(data)
     new UnaryOutput(newDataFrame)
@@ -519,7 +513,7 @@ class IDFTransformer(override val data: DataFrame) extends Pretreater[UnaryOutpu
 
 
 /** 低变异性数值特征转类别特征 */
-class VectorIndexerTransformer(override val data: DataFrame) extends Pretreater[BinaryOutput](data) {
+class VectorIndexerTransformer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
   override protected def paramsValid(): Boolean = true
 
   /**
@@ -527,45 +521,45 @@ class VectorIndexerTransformer(override val data: DataFrame) extends Pretreater[
     *
     * @return 输出一个PretreatmentOutput的实现子类型
     */
-  override protected def runAlgorithm(): BinaryOutput = {
-    import org.apache.spark.ml.feature.{VectorIndexer, VectorIndexerModel}
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.ml.feature.VectorIndexer
 
     val inputCol = getParams[String](VectorIndexerParams.inputCol)
     val outputCol = getParams[String](VectorIndexerParams.outputCol)
-    val loadModel = getParamsOrElse[Boolean](VectorIndexerParams.loadModel, false)
+    //    val loadModel = getParamsOrElse[Boolean](VectorIndexerParams.loadModel, false)
+    //
+    //    val viModel = if (loadModel) {
+    //      val loadPath = getParams[String](VectorIndexerParams.loadPath)
+    //      VectorIndexerModel.load(loadPath)
+    //    } else {
+    val trainData = getParamsOrElse[DataFrame](VectorIndexerParams.trainData, data)
+    val trainInputCol = getParamsOrElse[String](VectorIndexerParams.trainInputCol, inputCol)
+    val trainOutputCol = getParamsOrElse[String](VectorIndexerParams.trainOutputCol, outputCol)
 
-    val viModel = if (loadModel) {
-      val loadPath = getParams[String](VectorIndexerParams.loadPath)
-      VectorIndexerModel.load(loadPath)
-    } else {
-      val trainData = getParamsOrElse[DataFrame](VectorIndexerParams.trainData, data)
-      val trainInputCol = getParamsOrElse[String](VectorIndexerParams.trainInputCol, inputCol)
-      val trainOutputCol = getParamsOrElse[String](VectorIndexerParams.trainOutputCol, outputCol)
+    val maxCategories = getParamsOrElse[Int](VectorIndexerParams.maxCategories, 20)
+    val model = new VectorIndexer()
+      .setInputCol(trainInputCol)
+      .setOutputCol(trainOutputCol)
+      .setMaxCategories(maxCategories)
+      .fit(trainData)
 
-      val maxCategories = getParamsOrElse[Int](VectorIndexerParams.maxCategories, 20)
-      val model = new VectorIndexer()
-        .setInputCol(trainInputCol)
-        .setOutputCol(trainOutputCol)
-        .setMaxCategories(maxCategories)
-        .fit(trainData)
-
-      val saveModel = getParamsOrElse[Boolean](IDFTransformerParams.saveModel, false)
-      if (saveModel) {
-        val savePath = getParams[String](IDFTransformerParams.savePath)
-        model.save(savePath)
-      }
-      model
-    }
-
-    val categoricalFeatures: Map[Int, Map[Double, Int]] = viModel.setInputCol(inputCol)
-      .setOutputCol(outputCol)
-      .categoryMaps
-    val newDataFrame = viModel.setInputCol(inputCol)
+    //      val saveModel = getParamsOrElse[Boolean](IDFTransformerParams.saveModel, false)
+    //      if (saveModel) {
+    //        val savePath = getParams[String](IDFTransformerParams.savePath)
+    //        model.save(savePath)
+    //      }
+    //      model
+    //    }
+    //
+    //    val categoricalFeatures: Map[Int, Map[Double, Int]] = viModel.setInputCol(inputCol)
+    //      .setOutputCol(outputCol)
+    //      .categoryMaps
+    val newDataFrame = model.setInputCol(inputCol)
       .setOutputCol(outputCol)
       .transform(data)
 
-    val categoryInfo = new CategoryInfoForVectorIndex(categoricalFeatures)
-    new BinaryOutput(newDataFrame, categoryInfo)
+    //    val categoryInfo = new CategoryInfoForVectorIndex(categoricalFeatures)
+    new UnaryOutput(newDataFrame)
   }
 }
 
@@ -579,36 +573,35 @@ class PCATransformer(override val data: DataFrame) extends Pretreater[UnaryOutpu
     * @return 输出一个PretreatmentOutput的实现子类型
     */
   override protected def runAlgorithm(): UnaryOutput = {
-    import org.apache.spark.ml.feature.{PCA, PCAModel}
+    import org.apache.spark.ml.feature.PCA
 
     val inputCol = getParams[String](PCAParams.inputCol)
     val outputCol = getParams[String](PCAParams.outputCol)
-    val loadModel = getParamsOrElse[Boolean](PCAParams.loadModel, false)
 
-    val pcaModel = if (loadModel) {
-      val loadPath = getParams[String](PCAParams.loadPath)
-      PCAModel.load(loadPath)
-    } else {
-      val trainData = getParamsOrElse[DataFrame](PCAParams.trainData, data)
-      val trainInputCol = getParamsOrElse[String](PCAParams.trainInputCol, inputCol)
-      val trainOutputCol = getParamsOrElse[String](PCAParams.trainOutputCol, outputCol)
-      val p = getParams[Int](PCAParams.p)
+    //    val pcaModel = if (loadModel) {
+    //      val loadPath = getParams[String](PCAParams.loadPath)
+    //      PCAModel.load(loadPath)
+    //    } else {
+    val trainData = getParamsOrElse[DataFrame](PCAParams.trainData, data)
+    val trainInputCol = getParamsOrElse[String](PCAParams.trainInputCol, inputCol)
+    val trainOutputCol = getParamsOrElse[String](PCAParams.trainOutputCol, outputCol)
+    val p = getParams[Int](PCAParams.p)
 
-      val model = new PCA()
-        .setInputCol(trainInputCol)
-        .setOutputCol(trainOutputCol)
-        .setK(p)
-        .fit(trainData)
+    val model = new PCA()
+      .setInputCol(trainInputCol)
+      .setOutputCol(trainOutputCol)
+      .setK(p)
+      .fit(trainData)
 
-      val saveModel = getParamsOrElse[Boolean](IDFTransformerParams.saveModel, false)
-      if (saveModel) {
-        val savePath = getParams[String](IDFTransformerParams.savePath)
-        model.save(savePath)
-      }
-      model
-    }
+    //      val saveModel = getParamsOrElse[Boolean](IDFTransformerParams.saveModel, false)
+    //      if (saveModel) {
+    //        val savePath = getParams[String](IDFTransformerParams.savePath)
+    //        model.save(savePath)
+    //      }
+    //      model
+    //    }
 
-    val newDataFrame = pcaModel.setInputCol(inputCol).setOutputCol(outputCol).transform(data)
+    val newDataFrame = model.setInputCol(inputCol).setOutputCol(outputCol).transform(data)
     new UnaryOutput(newDataFrame)
   }
 }
@@ -679,43 +672,45 @@ class StringIndexTransformer(override val data: DataFrame) extends Pretreater[Un
 
     val inputCol = getParams[String](StringIndexParams.inputCol)
     val outputCol = getParams[String](StringIndexParams.outputCol)
-    val loadModel = getParamsOrElse[Boolean](StringIndexParams.loadModel, false)
-
-    val stringVectorModel: StringIndexerModel = if (loadModel) {
-      val loadPath = getParams[String](StringIndexParams.loadPath)
-      StringIndexerModel.load(loadPath)
-    } else {
-      val trainData = getParamsOrElse[DataFrame](StringIndexParams.trainData, data)
-      val trainInputCol = getParamsOrElse[String](StringIndexParams.trainInputCol, inputCol)
-      val trainOutputCol = getParamsOrElse[String](StringIndexParams.trainOutputCol, outputCol)
-
-      val model = new StringIndexer()
-        .setInputCol(trainInputCol)
-        .setOutputCol(trainOutputCol)
-        .setHandleInvalid("skip") // Array("skip", "error"))
-        .fit(trainData)
-
-      val saveModel = getParamsOrElse[Boolean](StringIndexParams.saveModel, false)
-      if (saveModel) {
-        val savePath = getParams[String](StringIndexParams.savePath)
-        model.save(savePath)
-      }
-      model
-    }
-    val handleInvalid = getParamsOrElse[String](StringIndexParams.handleInvalid, "skip")
+    //    val loadModel = getParamsOrElse[Boolean](StringIndexParams.loadModel, false)
+    //
+    //    val stringVectorModel: StringIndexerModel = if (loadModel) {
+    //      val loadPath = getParams[String](StringIndexParams.loadPath)
+    //      StringIndexerModel.load(loadPath)
+    //    } else {
+    //      val trainData = getParamsOrElse[DataFrame](StringIndexParams.trainData, data)
+    //      val trainInputCol = getParamsOrElse[String](StringIndexParams.trainInputCol, inputCol)
+    //      val trainOutputCol = getParamsOrElse[String](StringIndexParams.trainOutputCol, outputCol)
 
     import org.apache.spark.sql.functions.col
 
     val newData = try {
-      data.withColumn(inputCol, col(inputCol).cast("double"))
+      data.withColumn(inputCol, col(inputCol).cast("string"))
     } catch {
       case e: Exception => throw new Exception(s"您输入的数据列${inputCol}不能转为double类型，${e.getMessage}")
     }
 
-    val newDataFrame = stringVectorModel
+
+    val model = new StringIndexer()
       .setInputCol(inputCol)
       .setOutputCol(outputCol)
-      .setHandleInvalid(handleInvalid)
+      //        .setHandleInvalid("skip") // Array("skip", "error"))
+      .fit(newData)
+
+    //      val saveModel = getParamsOrElse[Boolean](StringIndexParams.saveModel, false)
+    //      if (saveModel) {
+    //        val savePath = getParams[String](StringIndexParams.savePath)
+    //        model.save(savePath)
+    //      }
+    //      model
+    //    }
+    //    val handleInvalid = getParamsOrElse[String](StringIndexParams.handleInvalid, "skip")
+
+
+    val newDataFrame = model
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      //      .setHandleInvalid(handleInvalid)
       .transform(newData)
 
     new UnaryOutput(newDataFrame)
@@ -736,41 +731,194 @@ class IndexerStringTransformer(override val data: DataFrame) extends Pretreater[
 
     val inputCol = getParams[String](IndexToStringParams.inputCol)
     val outputCol = getParams[String](IndexToStringParams.outputCol)
-    val loadModel = getParamsOrElse[Boolean](IndexToStringParams.loadModel, false)
+    //    val loadModel = getParamsOrElse[Boolean](IndexToStringParams.loadModel, false)
+    //
+    //    val indexToString: IndexToString = if (loadModel) {
+    //      val loadPath = getParams[String](IndexToStringParams.loadPath)
+    //      IndexToString.load(loadPath)
+    //    } else {
+    //    val trainInputCol = getParamsOrElse[String](IndexToStringParams.trainInputCol, inputCol)
+    //    val trainOutputCol = getParamsOrElse[String](IndexToStringParams.trainOutputCol, outputCol)
+    val labels = getParams[Array[String]](IndexToStringParams.labels)
 
-    val indexToString: IndexToString = if (loadModel) {
-      val loadPath = getParams[String](IndexToStringParams.loadPath)
-      IndexToString.load(loadPath)
-    } else {
-      val trainInputCol = getParamsOrElse[String](IndexToStringParams.trainInputCol, inputCol)
-      val trainOutputCol = getParamsOrElse[String](IndexToStringParams.trainOutputCol, outputCol)
-      val labels = getParams[Array[String]](IndexToStringParams.labels)
-
-      val model = new IndexToString()
-        .setInputCol(trainInputCol)
-        .setOutputCol(trainOutputCol)
-        .setLabels(labels)
+    val model = new IndexToString()
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .setLabels(labels)
 
 
-      val saveModel = getParamsOrElse[Boolean](StringIndexParams.saveModel, false)
-      if (saveModel) {
-        val savePath = getParams[String](StringIndexParams.savePath)
-        model.save(savePath)
-      }
-      model
-    }
+    //      val saveModel = getParamsOrElse[Boolean](StringIndexParams.saveModel, false)
+    //      if (saveModel) {
+    //        val savePath = getParams[String](StringIndexParams.savePath)
+    //        model.save(savePath)
+    //      }
+    //      model
+    //    }
 
     val newData = try {
-      data.filter(s"$inputCol < ${indexToString.getLabels.length}")
+      data.filter(s"$inputCol < ${model.getLabels.length}")
     } catch {
       case e: Exception => throw new Exception(s"数据过滤中失败，" +
         s"请检查${inputCol}是否存在或者类型是否是double类型，${e.getMessage}")
     }
 
-    val newDataFrame = indexToString
+    val newDataFrame = model
       .setInputCol(inputCol)
       .setOutputCol(outputCol)
       .transform(newData)
+
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
+class ElementProduct(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.ml.feature.ElementwiseProduct
+    import org.apache.spark.mllib.linalg.Vectors
+
+
+    val inputCol = getParams[String](ElementProductParams.inputCol)
+    val outputCol = getParams[String](ElementProductParams.outputCol)
+    val weights = getParams[Array[Double]](ElementProductParams.weight)
+
+    val transformingVector = Vectors.dense(weights)
+    val newDataFrame = new ElementwiseProduct()
+      .setScalingVec(transformingVector)
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .transform(data)
+
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
+class VectorAssembleTransformer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.ml.feature.VectorAssembler
+    val inputCols = getParams[Array[String]](VectorAssembleParams.inputCol)
+    val outputCol = getParams[String](VectorAssembleParams.outputCol)
+    import org.apache.spark.mllib.linalg.VectorUDT
+    import org.apache.spark.sql.types._
+    val types = Array(DoubleType, BooleanType, IntegerType, FloatType, LongType)
+
+    require(inputCols.forall(data.schema.fieldNames contains _), "有列名不在数据表中")
+    data.schema.foreach(field =>
+      if (inputCols contains field.name) {
+        if (!field.dataType.isInstanceOf[VectorUDT]) {
+          require(types contains field.dataType, s"集成的数据类型必须是Vector类型或${types.map(_.toString).mkString(",")}")
+        }
+      }
+    )
+
+    val newDataFrame = new VectorAssembler()
+      .setInputCols(inputCols)
+      .setOutputCol(outputCol)
+      .transform(data)
+
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
+class ChiFeatureSqSelector(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    import org.apache.spark.mllib.feature.ChiSqSelector
+    import org.apache.spark.mllib.linalg.Vector
+
+    val inputCol = getParams[String](ChiFeatureSqSelectorParams.inputCol)
+    val outputCol = getParams[String](ChiFeatureSqSelectorParams.outputCol)
+    val labeledCol = getParams[String](ChiFeatureSqSelectorParams.labeledCol)
+    val topFeatureNums = getParams[Int](ChiFeatureSqSelectorParams.topFeatureNums)
+
+
+    val chiSqModel = new ChiSqSelector(topFeatureNums).fit(
+      data.select(labeledCol, inputCol).na.drop("any").rdd.map(
+        row => {
+          val label = row.get(0).asInstanceOf[Double]
+          val features = row.getAs[Vector](1)
+          LabeledPoint(label, features)
+        }))
+
+    val transformUDF = NullableFunctions.udf((v: Vector) => chiSqModel.transform(v))
+
+    val newDataFrame = data.withColumn(outputCol, transformUDF(col(inputCol)))
+
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
+class VectorIndices(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+
+    import org.apache.spark.ml.feature.VectorSlicer
+
+    val inputCol = getParams[String](VectorIndicesParams.inputCol)
+    val outputCol = getParams[String](VectorIndicesParams.outputCol)
+    val indices = getParams[Array[Int]](VectorIndicesParams.indices)
+
+    val newDataFrame = new VectorSlicer()
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .setIndices(indices)
+      .transform(data)
+
+    new UnaryOutput(newDataFrame)
+  }
+}
+
+
+class NormalizerTransformer(override val data: DataFrame) extends Pretreater[UnaryOutput](data) {
+  override protected def paramsValid(): Boolean = true
+
+  /**
+    * [运行函数]接口
+    *
+    * @return 输出一个PretreatmentOutput的实现子类型
+    */
+  override protected def runAlgorithm(): UnaryOutput = {
+    /** 正则化 */
+    import org.apache.spark.ml.feature.Normalizer
+
+    val inputCol = getParams[String](NormalizerParams.inputCol)
+    val outputCol = getParams[String](NormalizerParams.outputCol)
+    val p = getParams[Double](NormalizerParams.p)
+
+    val newDataFrame = new Normalizer()
+      .setInputCol(inputCol)
+      .setOutputCol(outputCol)
+      .setP(p)
+      .transform(data)
 
     new UnaryOutput(newDataFrame)
   }
@@ -936,7 +1084,25 @@ object IndexToStringParams extends ParamsNameFromSavableModel {
 }
 
 
+object ElementProductParams extends ParamsName {
+  val weight = ParamInfo("weight", "权重")
+}
 
+object VectorAssembleParams extends ParamsName
+
+object ChiFeatureSqSelectorParams extends ParamsNameFromSavableModel {
+  val labeledCol = ParamInfo("labeledCol", "标签列")
+  val topFeatureNums = ParamInfo("topFeatureNums", "选取的特征数")
+}
+
+
+object VectorIndicesParams extends ParamsName {
+  val indices = ParamInfo("indices", "选择特征的位置索引")
+}
+
+object NormalizerParams extends ParamsName {
+  val p = ParamInfo("p", "正则化阶数")
+}
 
 
 
