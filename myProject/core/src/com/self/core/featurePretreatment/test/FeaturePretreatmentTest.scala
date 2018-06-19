@@ -25,7 +25,6 @@ object FeaturePretreatmentTest extends BaseMain {
     val inputCol = "sentence"
     val outputCol = "sentenceOut"
 
-
     val data1 = {
       val tokenizer = new Tokenizer().setInputCol("sentence").setOutputCol("words")
       val wordsData = tokenizer.transform(data)
@@ -248,10 +247,6 @@ object FeaturePretreatmentTest extends BaseMain {
       .setParams(WordToVectorParamsName.minCount, 1)
       .setParams(WordToVectorParamsName.numPartitions, 1)
       .setParams(WordToVectorParamsName.numIterations, 10)
-      .setParams(WordToVectorParamsName.loadModel, false)
-      .setParams(WordToVectorParamsName.loadPath, "")
-      .setParams(WordToVectorParamsName.saveModel, false)
-      .setParams(WordToVectorParamsName.savePath, "")
       .run()
       .data
 
@@ -325,26 +320,6 @@ object FeaturePretreatmentTest extends BaseMain {
 
     byWidthDF.show()
 
-    //    val byDepthDF = new Discretizer(rawDataFrame)
-    //      .setParams(DiscretizerParams.inputCol, "hour")
-    //      .setParams(DiscretizerParams.outputCol, "outputCol")
-    //      .setParams(DiscretizerParams.discretizeFormat, "byDepth")
-    //      .setParams(DiscretizerParams.depth, 2.0) // @todo 必须是Double，否则java.lang.Integer cannot be cast to java.lang.Double
-    //      .run()
-    //      .data
-    //
-    //    byDepthDF.show()
-    //
-    //    val byDepthDF2 = new Discretizer(rawDataFrame)
-    //      .setParams(DiscretizerParams.inputCol, "hour")
-    //      .setParams(DiscretizerParams.outputCol, "outputCol")
-    //      .setParams(DiscretizerParams.discretizeFormat, "byDepth")
-    //      .setParams(DiscretizerParams.boxesNum, 4.0) // @todo 必须是Double，否则java.lang.Integer cannot be cast to java.lang.Double
-    //      .run()
-    //      .data
-    //
-    //    byDepthDF2.show()
-
     val byDepthDF3 = new Discretizer(rawDataFrame)
       .setParams(DiscretizerParams.inputCol, "hour")
       .setParams(DiscretizerParams.outputCol, "outputCol")
@@ -362,7 +337,6 @@ object FeaturePretreatmentTest extends BaseMain {
   def test8() = {
     val rawDataFrame = data7.data
     rawDataFrame.show()
-
 
     import com.zzjz.deepinsight.core.featurePretreatment.models.{OneHotCoder, OneHotCoderParams}
 
@@ -480,7 +454,6 @@ object FeaturePretreatmentTest extends BaseMain {
     newDataFrame.show()
 
   }
-
 
   def test14() = {
     import com.zzjz.deepinsight.core.featurePretreatment.models.{StringIndexParams, StringIndexTransformer}
@@ -649,6 +622,51 @@ object FeaturePretreatmentTest extends BaseMain {
   }
 
 
+  def test21() = {
+
+    import org.apache.spark.ml.feature.StandardScaler
+
+    val data = Seq(
+      Vectors.dense(0.0, 1.0, -2.0, 3.0),
+      Vectors.dense(-1.0, 2.0, 4.0, -7.0),
+      Vectors.dense(13.0, 14.0, 14.0, 14.0))
+
+    val dataFrame = sqlc.createDataFrame(data.map(Tuple1.apply)).toDF("features")
+
+    dataFrame.show()
+
+    val scaler = new StandardScaler()
+      .setInputCol("features")
+      .setOutputCol("scaledFeatures")
+      .setWithStd(false)
+      .setWithMean(true)
+
+    // Compute summary statistics by fitting the StandardScaler.
+    val scalerModel = scaler.fit(dataFrame)
+
+    // Normalize each feature to have unit standard deviation.
+    val scaledData = scalerModel.transform(dataFrame)
+    scaledData.show()
+
+    /** min-max */
+    import org.apache.spark.ml.feature.MinMaxScaler
+    val scaler2 = new MinMaxScaler()
+      .setInputCol("features")
+      .setOutputCol("scaledFeatures")
+      .setMax(100.0)
+
+    // Compute summary statistics and generate MinMaxScalerModel
+    val scalerModel2 = scaler2.fit(dataFrame)
+
+    // rescale each feature to range [min, max].
+    val scaledData2 = scalerModel2.transform(dataFrame)
+    scaledData2.show()
+
+
+  }
+
+
+
 
   override def run(): Unit = {
 
@@ -692,6 +710,28 @@ object FeaturePretreatmentTest extends BaseMain {
     //        test19()
 
     //        test20()
+
+
+    val vocabSizeString = "16^2"
+
+
+
+    val vocabSize = if (vocabSizeString contains '^') {
+      try {
+        vocabSizeString.split('^').map(_.trim.toDouble).reduceLeft((d, s) => scala.math.pow(d, s)).toInt
+      } catch {
+        case e: Exception => throw new Exception(s"您输入词汇数参数表达式中包含指数运算符^，" +
+          s"但^两侧可能包含不能转为数值类型的字符，或您输入的指数过大超过了2^31，具体错误为.${e.getMessage}")
+      }
+    } else {
+      try {
+        vocabSizeString.toDouble.toInt
+      } catch {
+        case e: Exception => throw new Exception(s"输入的词汇数参数不能转为数值类型，具体错误为.${e.getMessage}")
+      }
+    }
+
+    println(vocabSize)
 
 
 
