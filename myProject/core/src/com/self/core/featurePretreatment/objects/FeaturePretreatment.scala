@@ -1,13 +1,13 @@
 package com.self.core.featurePretreatment.objects
 
 import com.google.gson.{Gson, JsonParser}
-import com.zzjz.deepinsight.basic.BaseMain
-import com.zzjz.deepinsight.core.featurePretreatment.models._
+import com.self.core.baseApp.myAPP
+import com.self.core.featurePretreatment.models._
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.sql.DataFrame
 
 
-object FeaturePretreatment extends BaseMain {
+object FeaturePretreatment extends myAPP {
   val data: DataFrame = {
     sqlc.createDataFrame(Seq(
       (0, "Hi I heard about Spark"),
@@ -30,12 +30,12 @@ object FeaturePretreatment extends BaseMain {
     val jsonparam = "<#zzjzParam#>"
     val gson = new Gson()
     val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
-    val z1 = z
+    val z1 = memoryMap
 
 
     /** 1)获取DataFrame */
     val tableName = p.get("inputTableName").trim
-    val rawDataFrame = z1.rdd(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
+    val rawDataFrame = z1.get(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
     val parser = new JsonParser()
     val pJsonParser = parser.parse(jsonparam).getAsJsonObject
 

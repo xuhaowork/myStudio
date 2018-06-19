@@ -1,7 +1,7 @@
 package com.self.core.featurePretreatment.test
 
-import com.zzjz.deepinsight.basic.BaseMain
-import com.zzjz.deepinsight.core.featurePretreatment.models._
+import com.self.core.baseApp.myAPP
+import com.self.core.featurePretreatment.models._
 import org.apache.spark.ml.feature.Tokenizer
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.sql.DataFrame
@@ -11,7 +11,7 @@ import org.apache.spark.sql.DataFrame
   * editor: xuhao
   * date: 2018-06-08 08:30:00
   */
-object FeaturePretreatmentTest extends BaseMain {
+object FeaturePretreatmentTest extends myAPP {
 
   object data1 {
     val data: DataFrame = {
