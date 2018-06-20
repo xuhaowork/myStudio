@@ -1,8 +1,14 @@
-/myProject/out/production/*
-/myProject/*.class
+# java class files
 *.class
-/myproject/out/production/core/com/self/core/testBaseApp/*.class
-/myproject/core/*.iml
-/myproject/core/core.iml
+
+# idea files
+*.iml
+*/*.iml
+*.idea
+
+
+# out dir
 /myproject/out/
-/myProject/core/*.iml
+
+
+
