@@ -41,6 +41,11 @@ object LearningLR extends myAPP {
     println(dataFrame.select("equalDense").schema.head.dataType)
 
 
+    import org.apache.spark.mllib.tree.RandomForest
+
+    import org.apache.spark.mllib.tree.RandomForest
+    import org.apache.spark.mllib.tree.model.RandomForestModel
+
   val u = Array.range(0, 10).map(_ => 2)
 
 
