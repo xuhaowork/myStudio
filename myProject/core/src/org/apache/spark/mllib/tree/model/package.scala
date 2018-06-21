@@ -23,19 +23,24 @@ package object model {
       */
     def predictProb(features: Vector): Double = {
       if (isLeaf) {
+//        println("leaf:", predict2.toString())
         predict2.prob
       } else {
         if (split2.get.featureType == Continuous) {
           if (features(split2.get.feature) <= split2.get.threshold) {
-            leftNode2.get.predict(features)
+//            println("leftNode:", leftNode2.get.toString())
+            leftNode2.get.toNodeWithProbPredict.predictProb(features)
           } else {
-            rightNode2.get.predict(features)
+//            println("rightNode:", rightNode2.get.toString())
+            rightNode2.get.toNodeWithProbPredict.predictProb(features)
           }
         } else {
           if (split2.get.categories.contains(features(split2.get.feature))) {
-            leftNode2.get.predict(features)
+//            println("leftNode:", leftNode2.get.toString())
+            leftNode2.get.toNodeWithProbPredict.predictProb(features)
           } else {
-            rightNode2.get.predict(features)
+//            println("rightNode:", rightNode2.get.toString())
+            rightNode2.get.toNodeWithProbPredict.predictProb(features)
           }
         }
       }
@@ -50,7 +55,7 @@ package object model {
           node.predict,
           node.impurity,
           node.isLeaf,
-          node.split,
+          None,
           None,
           None,
           node.stats)

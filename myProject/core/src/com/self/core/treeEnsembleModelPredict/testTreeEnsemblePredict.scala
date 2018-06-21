@@ -1,6 +1,7 @@
 package com.self.core.treeEnsembleModelPredict
 
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
+import org.apache.spark.mllib.tree.model.Node
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector}
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.DecisionTree
@@ -8,7 +9,7 @@ import org.apache.spark.mllib.tree.model.DecisionTreeModel
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.DataFrame
 
-object testTreeEnsemblePredict extends BaseMain {
+object testTreeEnsemblePredict extends myAPP {
   override def run(): Unit = {
     println("good")
 
@@ -93,6 +94,36 @@ object testTreeEnsemblePredict extends BaseMain {
       val prediction = model.predict(point.features)
       (point.label, prediction, prob)
     }.foreach(println)
+
+//    val someV = Vectors.dense(Array(25.0, 1.0, 2.0, 1.0))
+//
+//
+//    def foreachPrint(node: Node): Unit = {
+//      if(node.isLeaf){
+//        println(node.predict.toString())
+//      }else{
+//        if(node.leftNode.isDefined){
+//          println(node.leftNode.get.toString())
+//          foreachPrint(node.leftNode.get)
+//        }else{
+//          println(node.rightNode.get.toString())
+//          foreachPrint(node.rightNode.get)
+//        }
+//
+//      }
+//
+//
+//    }
+//
+//    foreachPrint(model.topNode)
+//    println("*" * 80)
+//
+//    foreachPrint(model.topNode.toNodeWithProbPredict)
+//
+//    println(model.topNode.toNodeWithProbPredict.predictProb(someV))
+//    println(model.predictProb(someV))
+//    println(model.topNode.leftNode)
+//    println(model.topNode.rightNode)
 
 
   }

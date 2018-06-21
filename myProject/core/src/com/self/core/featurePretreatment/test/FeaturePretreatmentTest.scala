@@ -87,7 +87,7 @@ object FeaturePretreatmentTest extends myAPP {
 
   object data7 {
     val data: DataFrame = {
-      import com.zzjz.deepinsight.core.featurePretreatment.models.{Discretizer, DiscretizerParams}
+      import com.self.core.featurePretreatment.models.{Discretizer, DiscretizerParams}
       val rawDataFrame = data6.data
 
       new Discretizer(rawDataFrame)
@@ -209,7 +209,7 @@ object FeaturePretreatmentTest extends myAPP {
   /** 3.hash词频统计 */
   def test3() = {
 
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{HashTF, HashTFParamsName}
+    import com.self.core.featurePretreatment.models.{HashTF, HashTFParamsName}
 
     val sentenceData = data1.data1
     val numFeature = 10000 // 在由string转过来的时候需要判断一下是否越界
@@ -233,7 +233,7 @@ object FeaturePretreatmentTest extends myAPP {
     val rawDataFrame = data1.data1
     rawDataFrame.show()
 
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{WordToVector, WordToVectorParamsName}
+    import com.self.core.featurePretreatment.models.{WordToVector, WordToVectorParamsName}
 
     val newDataFrame = new WordToVector(rawDataFrame)
       .setParams(WordToVectorParamsName.inputCol, "words")
@@ -259,7 +259,7 @@ object FeaturePretreatmentTest extends myAPP {
 
   /** 5. */
   def test5() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{StopWordsRemoverParamsName, StopWordsRmv, StopWordsUtils}
+    import com.self.core.featurePretreatment.models.{StopWordsRemoverParamsName, StopWordsRmv, StopWordsUtils}
 
     val stopWordsFormat = "English" // "chinese", "byHand", "byFile"
 
@@ -288,7 +288,7 @@ object FeaturePretreatmentTest extends myAPP {
 
   def test6() = {
     /** n-gram */
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{NGramMD, NGramParamsName}
+    import com.self.core.featurePretreatment.models.{NGramMD, NGramParamsName}
 
     val rawDataFrame = data5.wordDataFrame
     val inputCol = data5.inputCol
@@ -306,7 +306,7 @@ object FeaturePretreatmentTest extends myAPP {
 
   /** 二、数值类型特征提取 */
   def test7() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{Discretizer, DiscretizerParams}
+    import com.self.core.featurePretreatment.models.{Discretizer, DiscretizerParams}
     val rawDataFrame = data6.data
 
     val byWidthDF = new Discretizer(rawDataFrame)
@@ -338,7 +338,7 @@ object FeaturePretreatmentTest extends myAPP {
     val rawDataFrame = data7.data
     rawDataFrame.show()
 
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{OneHotCoder, OneHotCoderParams}
+    import com.self.core.featurePretreatment.models.{OneHotCoder, OneHotCoderParams}
 
     val newDataFrame = new OneHotCoder(rawDataFrame)
       .setParams(OneHotCoderParams.inputCol, "outputCol")
@@ -358,7 +358,7 @@ object FeaturePretreatmentTest extends myAPP {
 
 
   def test9(): DataFrame = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{IDFTransformer, IDFTransformerParams}
+    import com.self.core.featurePretreatment.models.{IDFTransformer, IDFTransformerParams}
     val rawDataFrame = test3()
 
     val inputCol = "wordsOutput"
@@ -386,7 +386,7 @@ object FeaturePretreatmentTest extends myAPP {
   }
 
   def test10() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{VectorIndexerParams, VectorIndexerTransformer}
+    import com.self.core.featurePretreatment.models.{VectorIndexerParams, VectorIndexerTransformer}
 
     val rawDataFrame = data8.data
 
@@ -407,7 +407,7 @@ object FeaturePretreatmentTest extends myAPP {
 
 
   def test11(): Unit = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{PCAParams, PCATransformer}
+    import com.self.core.featurePretreatment.models.{PCAParams, PCATransformer}
     val rawDataFrame = data9.data
     val inputCol = "pcaFeature"
     rawDataFrame.show()
@@ -423,7 +423,7 @@ object FeaturePretreatmentTest extends myAPP {
   }
 
   def test12(): Unit = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{PlynExpansionParams, PlynExpansionTransformer}
+    import com.self.core.featurePretreatment.models.{PlynExpansionParams, PlynExpansionTransformer}
     val rawDataFrame = data9.data2
     val inputCol = "pcaFeature"
     rawDataFrame.show()
@@ -438,7 +438,7 @@ object FeaturePretreatmentTest extends myAPP {
   }
 
   def test13() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{DCTParams, DCTTransformer}
+    import com.self.core.featurePretreatment.models.{DCTParams, DCTTransformer}
     val rawDataFrame = data9.data2
     val inputCol = "pcaFeature"
     val outputCol = "outputCol"
@@ -456,7 +456,7 @@ object FeaturePretreatmentTest extends myAPP {
   }
 
   def test14() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{StringIndexParams, StringIndexTransformer}
+    import com.self.core.featurePretreatment.models.{StringIndexParams, StringIndexTransformer}
 
     val rawDataFrame = data10.data
     val inputCol = data10.inputCol
@@ -496,7 +496,7 @@ object FeaturePretreatmentTest extends myAPP {
 
 
   def test15() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{IndexToStringParams, IndexerStringTransformer}
+    import com.self.core.featurePretreatment.models.{IndexToStringParams, IndexerStringTransformer}
 
     val rawDataFrame = data10.data
     val inputCol = "id"
@@ -522,7 +522,7 @@ object FeaturePretreatmentTest extends myAPP {
 
     rawDataFrame.show()
 
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{ElementProduct, ElementProductParams}
+    import com.self.core.featurePretreatment.models.{ElementProduct, ElementProductParams}
 
     val inputCol = "vector"
     val outputCol = "outputCol"
@@ -544,7 +544,7 @@ object FeaturePretreatmentTest extends myAPP {
 
 
   def test17() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{VectorAssembleParams, VectorAssembleTransformer}
+    import com.self.core.featurePretreatment.models.{VectorAssembleParams, VectorAssembleTransformer}
     import org.apache.spark.mllib.linalg.Vectors
     val rawDataFrame = sqlc.createDataFrame(
       Seq((0, Array(1.0, 2.0, 3.0), Vectors.dense(10.0, 0.5), Vectors.dense(0.0, 10.0, 0.5), 1.0))
@@ -565,7 +565,7 @@ object FeaturePretreatmentTest extends myAPP {
 
 
   def test18() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{ChiFeatureSqSelector, ChiFeatureSqSelectorParams}
+    import com.self.core.featurePretreatment.models.{ChiFeatureSqSelector, ChiFeatureSqSelectorParams}
     import org.apache.spark.mllib.linalg.Vectors
 
     val rawDataFrame = sqlc.createDataFrame(Seq(
@@ -586,7 +586,7 @@ object FeaturePretreatmentTest extends myAPP {
 
 
   def test19() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{VectorIndices, VectorIndicesParams}
+    import com.self.core.featurePretreatment.models.{VectorIndices, VectorIndicesParams}
     val rawDataFrame = sqlc.createDataFrame(Seq(
       (7, Vectors.dense(0.0, 0.0, 18.0, 1.0), 1.0),
       (8, Vectors.dense(0.0, 1.0, 12.0, 0.0), 0.0),
@@ -604,7 +604,7 @@ object FeaturePretreatmentTest extends myAPP {
 
 
   def test20() = {
-    import com.zzjz.deepinsight.core.featurePretreatment.models.{NormalizerParams, NormalizerTransformer}
+    import com.self.core.featurePretreatment.models.{NormalizerParams, NormalizerTransformer}
     val rawDataFrame = sqlc.createDataFrame(Seq(
       (7, Vectors.dense(0.0, 0.0, 18.0, 1.0), 1.0),
       (8, Vectors.dense(0.0, 1.0, 12.0, 0.0), 0.0),

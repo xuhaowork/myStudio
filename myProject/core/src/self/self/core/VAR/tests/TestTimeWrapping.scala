@@ -1,4 +1,4 @@
-package com.self.core.VAR.tests
+package self.self.core.VAR.tests
 
 import java.text.SimpleDateFormat
 
