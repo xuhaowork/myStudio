@@ -1,16 +1,16 @@
 package com.self.core.treeEnsembleModelPredict.objects
 
 import com.google.gson.{Gson, JsonParser}
-import com.zzjz.deepinsight.basic.BaseMain
-import com.zzjz.deepinsight.core.featurePretreatment.utils.Tools
-import com.zzjz.deepinsight.core.treeEnsembleModelPredict.models.ImplicitForDecisionTree._
+import com.self.core.baseApp.myAPP
+import com.self.core.featurePretreatment.utils.Tools
+import com.self.core.treeEnsembleModelPredict.models.ImplicitForDecisionTree._
 import org.apache.spark.mllib.linalg.Vectors
 import org.apache.spark.mllib.tree.model.DecisionTreeModel
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.types.{DoubleType, StructField}
 
 
-object treeEnsembelModelPredict2 extends BaseMain {
+object treeEnsembelModelPredict2 extends myAPP {
   override def run(): Unit = {
     /**
       * 一些参数的处理
@@ -21,7 +21,7 @@ object treeEnsembelModelPredict2 extends BaseMain {
     val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
     val parser = new JsonParser()
     val pJsonParser = parser.parse(jsonparam).getAsJsonObject
-    val z1 = z
+    val z1 = outputrdd
     val rddTableName = "<#zzjzRddName#>"
 
     /** 1)获取DataFrame */
@@ -32,7 +32,7 @@ object treeEnsembelModelPredict2 extends BaseMain {
     }
 
     val rawDataFrame = try {
-      z1.rdd(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
+      z1.get(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
     } catch {
       case e: Exception => throw new Exception(s"获取预测表${tableName}过程中失败，具体信息${e.getMessage}")
     }
@@ -55,7 +55,7 @@ object treeEnsembelModelPredict2 extends BaseMain {
     }
 
     val predictTable = try {
-      z1.rdd(predictTableName).asInstanceOf[org.apache.spark.sql.DataFrame]
+      z1.get(predictTableName).asInstanceOf[org.apache.spark.sql.DataFrame]
     } catch {
       case e: Exception => throw new Exception(s"获取模型信息${tableName}过程中失败，具体信息${e.getMessage}")
     }

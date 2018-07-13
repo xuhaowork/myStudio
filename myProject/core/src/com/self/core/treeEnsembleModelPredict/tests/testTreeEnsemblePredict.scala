@@ -1,7 +1,7 @@
 package com.self.core.treeEnsembleModelPredict.tests
 
-import com.zzjz.deepinsight.basic.BaseMain
-import com.zzjz.deepinsight.core.featurePretreatment.utils.Tools
+import com.self.core.baseApp.myAPP
+import com.self.core.featurePretreatment.utils.Tools
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.mllib.tree.DecisionTree
@@ -13,7 +13,7 @@ import org.apache.spark.sql.{DataFrame, Row, UserDefinedFunction}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-object testTreeEnsemblePredict extends BaseMain {
+object testTreeEnsemblePredict extends myAPP {
   def simulate(): DecisionTreeModel = {
     val rawDataFrame = sqlc.createDataFrame(
       Array(
@@ -133,7 +133,7 @@ object testTreeEnsemblePredict extends BaseMain {
     val naType = "skip" // "error", "skip"
 
 
-    import com.zzjz.deepinsight.core.treeEnsembleModelPredict.models.ImplicitForDecisionTree._
+    import com.self.core.treeEnsembleModelPredict.models.ImplicitForDecisionTree._
     def materialForUDF(predict: String, naType: String = naType): UserDefinedFunction = udf {
       (row: Row) =>
         val arr = mutable.ArrayBuilder.make[Double]

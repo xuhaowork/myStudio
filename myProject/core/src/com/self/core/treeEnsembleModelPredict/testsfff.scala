@@ -1,12 +1,12 @@
 package com.self.core.treeEnsembleModelPredict
 
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
 import org.apache.spark.mllib.linalg.{Vector, Vectors}
 import org.apache.spark.sql.Row
 
 import scala.collection.mutable
 
-object testsfff2 extends BaseMain{
+object testsfff2 extends myAPP{
   override def run(): Unit = {
 
     val rawDataFrame = sqlc.createDataFrame(

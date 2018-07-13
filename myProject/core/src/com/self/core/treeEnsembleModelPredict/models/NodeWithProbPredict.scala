@@ -32,7 +32,7 @@ class NodeWithProbPredict(val id2: Int,
 
   /** 引入隐式转换[[ImplicitForDecisionTree]] */
 
-  import com.zzjz.deepinsight.core.treeEnsembleModelPredict.models.ImplicitForDecisionTree._
+  import com.self.core.treeEnsembleModelPredict.models.ImplicitForDecisionTree._
 
   /**
     * 加入预测概率的函数
