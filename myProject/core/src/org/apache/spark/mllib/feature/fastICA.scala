@@ -7,12 +7,11 @@ import breeze.numerics.{abs => brzAbs, sqrt => brzSqrt}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Logging
 import org.apache.spark.storage.StorageLevel
-
 import scala.math
 
 
 /**
-  * editor: datashoe
+  * editor: xuhao
   * date: 2018-02-10 09:00:00
   */
 

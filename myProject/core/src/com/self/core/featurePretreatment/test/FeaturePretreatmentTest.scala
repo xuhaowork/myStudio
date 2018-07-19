@@ -1,10 +1,19 @@
 package com.self.core.featurePretreatment.test
 
+import java.sql.Timestamp
+
 import com.self.core.baseApp.myAPP
 import com.self.core.featurePretreatment.models._
+import com.self.core.featurePretreatment.utils.Tools
+import org.apache.spark.SparkException
 import org.apache.spark.ml.feature.Tokenizer
-import org.apache.spark.mllib.linalg.Vectors
-import org.apache.spark.sql.DataFrame
+import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, Vectors}
+import org.apache.spark.sql.functions.{col, struct, udf}
+import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, Row}
+
+import scala.collection.mutable
+import scala.collection.mutable.ArrayBuffer
 
 
 /**
@@ -550,7 +559,7 @@ object FeaturePretreatmentTest extends myAPP {
       Seq((0, Array(1.0, 2.0, 3.0), Vectors.dense(10.0, 0.5), Vectors.dense(0.0, 10.0, 0.5), 1.0))
     ).toDF("id", "hour", "mobile", "userFeatures", "clicked")
 
-    val inputCols = Array("id", "mobile", "userFeatures")
+    val inputCols = Array("id", "hour", "mobile", "userFeatures")
     val outputCols = "outputCols"
 
     val newDataFrame = new VectorAssembleTransformer(rawDataFrame)
@@ -666,6 +675,198 @@ object FeaturePretreatmentTest extends myAPP {
   }
 
 
+  def test22() = {
+    val data = Seq(
+      (-1.0, Vectors.dense(Array(1.0, 3.0, 5.0)), 11F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+      (0.0, Vectors.dense(Array(1.0)), 13F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+      (2.0, Vectors.sparse(6, Array(1, 3), Array(0.0, 1.0)), 15F, Vectors.dense(Array(1.0, 2.0, -0.0)))
+    )
+
+    val dataFrame = sqlc.createDataFrame(data).toDF("features", "notEqualLengthVector", "floatType", "equalDense")
+    import com.self.core.featurePretreatment.models.{ChiFeatureSqSelector, ChiFeatureSqSelectorParams}
+    val df = new ChiFeatureSqSelector(dataFrame)
+      .setParams(ChiFeatureSqSelectorParams.inputCol, "equalDense")
+      .setParams(ChiFeatureSqSelectorParams.outputCol, "outputCol")
+      .setParams(ChiFeatureSqSelectorParams.labeledCol, "floatType")
+      .setParams(ChiFeatureSqSelectorParams.topFeatureNums, 2)
+      .run()
+      .data
+
+    df.show()
+  }
+
+
+  def test23() = {
+    /** 向量拆分 */
+    val data = Seq(
+      (-1.0, Vectors.dense(Array(1.0, 3.0, 5.0)), 11F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+      (0.0, Vectors.dense(Array(1.0)), 13F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+      (2.0, Vectors.sparse(6, Array(1, 3), Array(0.0, 1.0)), 15F, Vectors.dense(Array(1.0, 2.0, -0.0)))
+    )
+
+    val dataFrame = sqlc.createDataFrame(data).toDF("features", "notEqualLengthVector", "floatType", "equalDense")
+
+    val inputCol = "equalDense"
+    val colNames: Option[Array[String]] = None
+
+    val rawSchema = dataFrame.schema
+    val inputID = rawSchema.fieldIndex(inputCol)
+
+    val (size, fields) = if (colNames.isEmpty) {
+      val size = dataFrame.select(inputCol).head.get(0) match {
+        case sv: Vector => sv.size
+        case _ =>
+          throw new Exception("您输入的数据类型不是vector类型")
+      }
+
+      val fields = Array.range(0, size).map(i => StructField(inputCol + "_" + i, DoubleType))
+
+      (size, fields)
+    } else {
+      val names = colNames.get
+      // @todo 需要确定数据中不存在该列名
+      (names.length, names.map(s => StructField(s, DoubleType)))
+    }
+
+    val rdd = dataFrame.rdd.map(row => {
+      val rowArr = row.toSeq
+      val values = new Array[Double](size)
+      rowArr(inputID) match {
+        case sv: SparseVector =>
+          sv.indices.foreach { index =>
+            if(index < size)
+              values(index) = sv.values(index)
+          }
+        case dv: DenseVector =>
+          var i = 0
+          while (i < scala.math.min(dv.size, size)) {
+            values(i) = dv.values(i)
+            i += 1
+          }
+        case _ =>
+          throw new SparkException("您输入的数据类型不是vector类型")
+      }
+
+      Row.fromSeq(rowArr.slice(0, inputID) ++ values ++ rowArr.slice(inputID + 1, rowArr.length))
+    })
+
+    val newSchema = StructType(rawSchema.slice(0, inputID) ++ fields ++ rawSchema.slice(inputID + 1, rawSchema.length))
+    val newDataFrame = dataFrame.sqlContext.createDataFrame(rdd, newSchema)
+    newDataFrame.show()
+  }
+
+
+  def test24() = {
+    /** 数组集成 */
+    val data = Seq(
+      (-1.0, Vectors.dense(Array(1.0, 3.0, 5.0)), 11F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+      (0.0, Vectors.dense(Array(1.0)), 13F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+      (2.0, Vectors.sparse(6, Array(1, 3), Array(0.0, 1.0)), 15F, Vectors.dense(Array(1.0, 2.0, -0.0)))
+    )
+
+    val dataFrame = sqlc.createDataFrame(data).toDF("features", "notEqualLengthVector", "floatType", "equalDense")
+
+    val inputCols = Array("features", "notEqualLengthVector", "equalDense")
+    val outputCol = "outputCol"
+    val typeName = "string"
+
+    val assembleFunc = Tools.getTheUdfByType(typeName)
+
+    val newDataFrame = dataFrame.select(col("*"), assembleFunc(struct(inputCols.map(col): _*)).as(outputCol))
+    newDataFrame.show()
+    newDataFrame.schema.foreach(println)
+
+  }
+
+
+  /** 数组拆分 */
+  def test25() = {
+    val data = Seq(
+      (-1.0, Array(1.0, 3.0, 5.0), 11F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+      (0.0, Array(1.0), 13F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+      (2.0, Array.empty[Double], 15F, Vectors.dense(Array(1.0, 2.0, -0.0)))
+    )
+
+    val dataFrame = sqlc.createDataFrame(data).toDF("features", "notEqualLengthArray", "floatType", "equalDense")
+
+    val inputCol = "notEqualLengthArray"
+    val colNames: Option[Array[String]] = None
+
+    val rawSchema = dataFrame.schema
+    val inputID = rawSchema.fieldIndex(inputCol)
+
+    /** 元素类型 */
+    val elementType = rawSchema(inputCol).dataType match {
+      case dt: ArrayType => dt.elementType
+      case others => throw new Exception(s"您输入列${inputCol}的类型为${others.simpleString}，不是array类型")
+    }
+    require(elementType == StringType || elementType == DoubleType, s"数组需要为一层嵌套数组，并且其中元素类型" +
+      s"只能是string或double，而您的类型为${elementType.simpleString}")
+
+    /** schema处理 */
+    val (size, fields) = if (colNames.isEmpty) {
+      val size = dataFrame.select(inputCol).head.get(0) match {
+        case sv: Seq[Any] => sv.length
+        case others =>
+          throw new Exception(s"您输入的数据类型不是数组类型，为${others.getClass.getName}")
+      }
+      require(size > 0, "您的数据第一条记录对应的数组为空，无法获得您想要生成列数")
+      val fields = Array.range(0, size).map(i => StructField(inputCol + "_" + i, elementType))
+
+      (size, fields)
+    } else {
+      val names = colNames.get
+      // @todo 需要确定数据中不存在该列名
+      (names.length, names.map(s => StructField(s, DoubleType)))
+    }
+
+
+    val rdd = dataFrame.rdd.map(row => {
+      val rowArr = row.toSeq
+
+      /**
+        * 算法：
+        * 1）等长数组 =>
+        * 按部就班地处理
+        * 2）非不等长数组 =>
+        * i)生成列数由输入列名数或第一条数据决定
+        * ii)数据处理过程中如果数组长度超出该数目不要，如果少于数目以对应空值填充
+        */
+      elementType match {
+        case StringType =>
+          rowArr(inputID) match {
+            case arr: Seq[String] =>
+              val values = new Array[String](size)
+              var i = 0
+              while (i < scala.math.min(arr.length, size)) {
+                values(i) = arr(i)
+                i += 1
+              }
+              Row.fromSeq(rowArr.slice(0, inputID) ++ values ++ rowArr.slice(inputID + 1, rowArr.length))
+            case _ =>
+              throw new SparkException("您输入的数据类型不是Array嵌套String或Double类型")
+          }
+        case DoubleType =>
+          rowArr(inputID) match {
+            case arr: Seq[Double] =>
+              val values = new Array[Double](size)
+              var i = 0
+              while (i < scala.math.min(arr.length, size)) {
+                values(i) = arr(i)
+                i += 1
+              }
+              Row.fromSeq(rowArr.slice(0, inputID) ++ values ++ rowArr.slice(inputID + 1, rowArr.length))
+            case _ =>
+              throw new SparkException("您输入的数据类型Array嵌套String或Double类型")
+          }
+      }
+
+    })
+
+    val newSchema = StructType(rawSchema.slice(0, inputID) ++ fields ++ rawSchema.slice(inputID + 1, rawSchema.length))
+    val newDataFrame = dataFrame.sqlContext.createDataFrame(rdd, newSchema)
+    newDataFrame.show()
+  }
 
 
   override def run(): Unit = {
@@ -703,7 +904,7 @@ object FeaturePretreatmentTest extends myAPP {
 
     //        test16()
 
-    //        test17()
+            test17()
 
     //        test18()
 
@@ -712,27 +913,73 @@ object FeaturePretreatmentTest extends myAPP {
     //        test20()
 
 
-    val vocabSizeString = "16^2"
+    //        test22()
+
+//        test23()
+//
+//        test24()
+//
+//    test25()
+
+    //    import org.apache.spark.mllib.linalg.Vectors
+    //    import org.apache.spark.sql.DataFrame
+    //    val data = Seq(
+    //      (-1.0, Vectors.dense(Array(1.0, 3.0, 5.0))),
+    //      (0.0, Vectors.dense(Array(1.0))),
+    //      (2.0, Vectors.sparse(1000000, Array(1, 3), Array(0.0, 1.0)).toDense)
+    //    )
+    //
+    //    val dataFrame = sqlc.createDataFrame(data).toDF("features", "notEqualLengthVector")
+    //
+    //    dataFrame.show()
+    //
+    //    import org.apache.spark.mllib.linalg.VectorUDT
+    //    println(dataFrame.select("equalDense").schema.head.dataType.typeName)
+
+    //    println(Int.MaxValue + 1)
+    //
+    //
+    //    val data = Seq(
+    //      (-1.0, Vectors.dense(Array(1.0, 3.0, 5.0)), 11F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+    //      (0.0, Vectors.dense(Array(1.0)), 13F, Vectors.dense(Array(1.0, 2.0, -0.0))),
+    //      (2.0, Vectors.sparse(6, Array(1, 3), Array(0.0, 1.0)), 15F, Vectors.dense(Array(1.0, 2.0, -0.0)))
+    //    )
+    //
+    //    val dataFrame = sqlc.createDataFrame(data).toDF("features", "notEqualLengthVector", "floatType", "equalDense")
+    //
+    //    dataFrame.show()
+    //    import org.apache.spark.mllib.linalg.Vector
+    //    val sparseToDense = NullableFunctions.udf((v: Vector) => v match {
+    //      case dv: DenseVector => dv
+    //      case sv: SparseVector => sv.toDense
+    //    })
+    //
+    //    val denseToSparse = NullableFunctions.udf((v: Vector) => v match {
+    //      case dv: DenseVector => dv.toSparse
+    //      case sv: SparseVector => sv
+    //    })
 
 
-
-    val vocabSize = if (vocabSizeString contains '^') {
-      try {
-        vocabSizeString.split('^').map(_.trim.toDouble).reduceLeft((d, s) => scala.math.pow(d, s)).toInt
-      } catch {
-        case e: Exception => throw new Exception(s"您输入词汇数参数表达式中包含指数运算符^，" +
-          s"但^两侧可能包含不能转为数值类型的字符，或您输入的指数过大超过了2^31，具体错误为.${e.getMessage}")
-      }
-    } else {
-      try {
-        vocabSizeString.toDouble.toInt
-      } catch {
-        case e: Exception => throw new Exception(s"输入的词汇数参数不能转为数值类型，具体错误为.${e.getMessage}")
-      }
-    }
-
-    println(vocabSize)
-
+    //    val vocabSizeString = "16^2"
+    //
+    //
+    //
+    //    val vocabSize = if (vocabSizeString contains '^') {
+    //      try {
+    //        vocabSizeString.split('^').map(_.trim.toDouble).reduceLeft((d, s) => scala.math.pow(d, s)).toInt
+    //      } catch {
+    //        case e: Exception => throw new Exception(s"您输入词汇数参数表达式中包含指数运算符^，" +
+    //          s"但^两侧可能包含不能转为数值类型的字符，或您输入的指数过大超过了2^31，具体错误为.${e.getMessage}")
+    //      }
+    //    } else {
+    //      try {
+    //        vocabSizeString.toDouble.toInt
+    //      } catch {
+    //        case e: Exception => throw new Exception(s"输入的词汇数参数不能转为数值类型，具体错误为.${e.getMessage}")
+    //      }
+    //    }
+    //
+    //    println(vocabSize)
 
 
   }

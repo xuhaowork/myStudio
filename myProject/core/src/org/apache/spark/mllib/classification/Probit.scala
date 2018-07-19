@@ -1,5 +1,14 @@
 package org.apache.spark.mllib.classification
 
+/**
+  * probit回归的核心运算API
+  */
+
+/**
+  * editor: xuhao
+  * date: 2018-05-15 10:30:00
+  */
+
 import breeze.stats.distributions.Gaussian
 import org.apache.spark.SparkContext
 import org.apache.spark.annotation.Since
@@ -14,15 +23,6 @@ import org.apache.spark.mllib.util.ToolsForMNP._
 import org.apache.spark.mllib.util.{DataValidators, Saveable}
 import org.apache.spark.rdd.RDD
 
-
-/**
-  * probit回归的核心运算API
-  */
-
-/**
-  * editor: datashoe
-  * date: 2018-05-15 10:30:00
-  */
 class ProbitGradient(val numClasses: Int, var diff: Double, var smoothSampleTimes: Int) extends Gradient {
   //  require(numClasses == 2, "目前只支持二分类")
 

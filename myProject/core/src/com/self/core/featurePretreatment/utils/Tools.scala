@@ -3,10 +3,10 @@ package com.self.core.featurePretreatment.utils
 import java.sql.Timestamp
 
 import org.apache.spark.SparkException
-import org.apache.spark.sql.{DataFrame, Row, UserDefinedFunction}
-import org.apache.spark.sql.types._
 import org.apache.spark.mllib.linalg.{DenseVector, SparseVector, Vector, VectorUDT}
 import org.apache.spark.sql.functions.udf
+import org.apache.spark.sql.types.DataType
+import org.apache.spark.sql.{DataFrame, Row, UserDefinedFunction}
 
 import scala.collection.mutable
 
@@ -124,6 +124,63 @@ object Tools {
           throw new Exception(s"您输入与的类型无法转为数值型，${e.getMessage}")
       }
     }
+  }
+
+  /**
+    * 确定新加入了的列名合规
+    * ----
+    * 检查：
+    * 1）不能包含特殊字符
+    * 2）长度不能超过100个字符
+    * 3）不能和已有列名重名
+    *
+    * @param colName 新加入的列名
+    * @param data    数据
+    * @return 如果合规返回true否则会抛出对应异常
+    */
+  def validNewColName(colName: String, data: DataFrame): Boolean = {
+    val specialCharacter = Seq(
+      '(', ')', '（', '）', '`', ''', '"', '。',
+      ';', '.', ',', '%', '^', '$', '{', '}',
+      '[', ']', '/', '\\', '+', '-', '*', '、',
+      ':', '<', '>')
+    val validCharacter = Seq('_', '#')
+    specialCharacter.foreach {
+      char =>
+        require(!(colName contains char), s"您输入的列名${colName}中包含特殊字符：$char," +
+          s" 列名信息中不能包含以下特殊字符：${specialCharacter.mkString(",")}," +
+          s" 如果您需要用特殊字符标识递进关系，您可以使用一下特殊字符：${validCharacter.mkString(",")}")
+    }
+
+    require(!Tools.columnExists(colName, data, false), s"您输入的列名${colName}在" +
+      s"数据列名${data.schema.fieldNames.mkString(",")}中已有同名列")
+    true
+  }
+
+
+  def nameANewCol(colName: String, data: DataFrame, suffix: String = "suffix"): String = {
+    var flag = true
+    var idCol = colName
+    val specialCharacter = Seq(
+      '(', ')', '（', '）', '`', ''', '"', '。',
+      ';', '.', ',', '%', '^', '$', '{', '}',
+      '[', ']', '/', '\\', '+', '-', '*', '、',
+      ':', '<', '>')
+    val validCharacter = Seq('_', '#')
+    specialCharacter.foreach {
+      char =>
+        require(!(idCol contains char), s"您输入的列名${idCol}中包含特殊字符：$char," +
+          s" 列名信息中不能包含以下特殊字符：${specialCharacter.mkString(",")}," +
+          s" 如果您需要用特殊字符标识递进关系，您可以使用一下特殊字符：${validCharacter.mkString(",")}")
+    }
+
+    while (flag) {
+      if (columnExists(idCol, data, false))
+        idCol += suffix
+      else
+        flag = false
+    }
+    idCol
   }
 
 
@@ -309,5 +366,6 @@ object Tools {
       }
       case _ => throw new Exception(s"暂不支持${typeName}类型")
     }
+
 
 }

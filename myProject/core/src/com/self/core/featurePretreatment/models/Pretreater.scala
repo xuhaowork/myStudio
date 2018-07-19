@@ -1,5 +1,6 @@
 package com.self.core.featurePretreatment.models
 
+import org.apache.spark.ml.feature.StringIndexerModel
 import org.apache.spark.mllib.linalg.{Vector, VectorUDT}
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.sql.NullableFunctions.udf
@@ -224,15 +225,13 @@ class WordToVector(override val data: DataFrame) extends Pretreater[UnaryOutput]
     val trainOutputCol = getParamsOrElse[String](WordToVectorParamsName.trainOutputCol,
       outputCol) // 如果不输入默认训练数据就是预测数据
 
-    val rdSeed = new java.util.Random().nextLong()
-
-    val vocabSize = getParamsOrElse[Int](WordToVectorParamsName.vocabSize, 1 << 18) // 默认 2^18
+    val vocabSize = getParamsOrElse[Int](WordToVectorParamsName.vocabSize, 100) // 默认 2^18
     //      val windowSize = getParamsOrElse[Int](WordToVectorParamsName.windowSize, 5) // 默认1.0
     val stepSize = getParamsOrElse[Double](WordToVectorParamsName.stepSize, 0.025) // 默认1.0 这里会设置一次，因为可能持久化
     val numPartitions = getParamsOrElse[Int](WordToVectorParamsName.numPartitions, 1) // 默认1.0 这里会设置一次，因为可能持久化
     val numIterations = getParamsOrElse[Int](WordToVectorParamsName.numIterations, 1) // 默认1.0 这里会设置一次，因为可能持久化
     val minCount = getParamsOrElse[Int](WordToVectorParamsName.minCount, 5)
-    val seed = getParamsOrElse[Long](WordToVectorParamsName.seed, rdSeed)
+    val seed = getParams[Long](WordToVectorParamsName.seed)
 
     val model = new Word2Vec()
       .setInputCol(trainInputCol)
@@ -557,7 +556,7 @@ class StringIndexTransformer(override val data: DataFrame) extends Pretreater[Un
       case e: Exception => throw new Exception(s"您输入的数据列${inputCol}不能转为double类型，${e.getMessage}")
     }
 
-    val model = new StringIndexer()
+    val model: StringIndexerModel = new StringIndexer()
       .setInputCol(inputCol)
       .setOutputCol(outputCol)
       .fit(newData)
@@ -593,7 +592,7 @@ class IndexerStringTransformer(override val data: DataFrame) extends Pretreater[
       .setLabels(labels)
 
     val newData = try {
-      data.filter(s"$inputCol < ${model.getLabels.length}")
+      data.filter(s"$inputCol < ${model.getLabels.length} and $inputCol >= 0")
     } catch {
       case e: Exception => throw new Exception(s"数据过滤中失败，" +
         s"请检查${inputCol}是否存在或者类型是否是double类型，${e.getMessage}")
@@ -647,10 +646,11 @@ class VectorAssembleTransformer(override val data: DataFrame) extends Pretreater
     * @return 输出一个PretreatmentOutput的实现子类型
     */
   override protected def runAlgorithm(): UnaryOutput = {
-    import org.apache.spark.ml.feature.VectorAssembler
+    import org.apache.spark.ml.feature.VectorAssemblerExtend
     val inputCols = getParams[Array[String]](VectorAssembleParams.inputCol)
     val outputCol = getParams[String](VectorAssembleParams.outputCol)
-    val types = Array(DoubleType, BooleanType, IntegerType, FloatType, LongType)
+    val types = Array(DoubleType, BooleanType, IntegerType, FloatType, LongType, ArrayType(StringType, true),
+      ArrayType(StringType, false), ArrayType(DoubleType, true), ArrayType(DoubleType, false))
 
     require(inputCols.forall(data.schema.fieldNames contains _), "有列名不在数据表中")
     data.schema.foreach(field =>
@@ -661,7 +661,7 @@ class VectorAssembleTransformer(override val data: DataFrame) extends Pretreater
       }
     )
 
-    val newDataFrame = new VectorAssembler()
+    val newDataFrame = new VectorAssemblerExtend()
       .setInputCols(inputCols)
       .setOutputCol(outputCol)
       .transform(data)
@@ -690,7 +690,7 @@ class ChiFeatureSqSelector(override val data: DataFrame) extends Pretreater[Unar
     val chiSqModel = new ChiSqSelector(topFeatureNums).fit(
       data.select(labeledCol, inputCol).na.drop("any").rdd.map(
         row => {
-          val label = row.get(0).asInstanceOf[Double]
+          val label = if(row.isNullAt(0)) 0.0 else row.get(0).toString.toDouble
           val features = row.getAs[Vector](1)
           LabeledPoint(label, features)
         }))
@@ -905,17 +905,14 @@ object WordToVectorParamsName extends ParamsName {
 
 }
 
-
 object StopWordsRemoverParamsName extends ParamsName {
   val caseSensitive = ParamInfo("caseSensitive", "是否区分大小写")
   val stopWords = ParamInfo("numIterations", "停用词") // 这里严格接受Array[String]类型的停用词，选择英语汉语停用词典放在外层
 }
 
-
 object NGramParamsName extends ParamsName {
   val n = ParamInfo("n", "gram数值")
 }
-
 
 object DiscretizerParams extends ParamsName {
   val discretizeFormat = ParamInfo("discretizeFormat", "离散化模式") // 分为等宽[byWidth]、等深[byDepth]、自定义[selfDefined]

@@ -3,7 +3,7 @@ package org.apache.spark.mllib.util
 import org.apache.spark.mllib.linalg.{BLAS, Vector}
 
 /**
-  * editor: datashoe
+  * editor: xuhao
   * date: 2018-03-26 08:30:00
   */
 

@@ -6,9 +6,29 @@ import breeze.linalg.{MatrixEmptyException, MatrixNotSymmetricException, cholesk
 import breeze.stats.distributions.Gaussian
 import org.apache.spark.mllib.linalg
 import org.apache.spark.mllib.linalg.BLAS.axpy
+import org.apache.spark.mllib.util.RobustCholesky
 
+/**
+  * probit求多分类是需要的工具文件
+  * ----
+  * 具体包括一下接口：
+  *
+  * @define multiNorm                多元正态的模拟
+  * @define VectorToTriangleMatrix   breeze向量转下三角矩阵的一个隐式转换
+  * @define minusElementaryMatrix    生成初等变换方阵的函数
+  * @define getNegativeLogLikelihood 获得负的对数似然函数
+  * @define getGradient              获得梯度
+  *                                  ----
+  *                                  另外还有上述接口调用的函数：
+  * @define smoothRecurse            实现了GHK的smooth recurse Markov-MonteCarlo求积分
+  * @define recurse                  被smoothRecurse调用
+  */
 
-object ToolsForMNP extends Serializable {
+/**
+  * editor: xuhao
+  * date: 2018-05-15 10:30:00
+  */
+object ToolsForMNP {
 
   // 模拟多元正态分布
   def multiNorm(num: Int, rd: Random, mean: BDV[Double], sigma: BDM[Double])
@@ -61,25 +81,21 @@ object ToolsForMNP extends Serializable {
                                num: Int,
                                R: Int = 100): Double = {
     require(weights.size == data.size * num + num * (num - 1) / 2, "参数数目不一致") // weight需要为 num * p + num * (num - 1) / 2维
-    import com.self.core.polr.models.VectorImplicit._
+    import com.self.core.polr.models.VectorImplicit.VectorLastImplicit
     val halfL = (1.0 +: Array.fill[Double](num - 1)(0.0)) ++ weights.last(num * (num - 1) / 2) // 取出rho,避免无法识别，需要L11 = 1, L_{j, 1} = 0
 
     val L: BDM[Double] = new BDV(halfL).toTriangle // 生成下三角矩阵 num * num维
     require(label < num && label >= 0, "label的类型应该标注为0.0至num - 1") // label 应该在0.0到num之间(左闭右开)
 
     val Aq = minusElementaryMatrix(num, label.toInt) // num * num维
-    val P_triangle: BDM[Double] = cholesky(Aq * L * L.t * Aq.t) // 得到Aq对应的协防差阵cholesky变换 num * num维
+    val P_triangle: BDM[Double] = RobustCholesky(Aq * L * L.t * Aq.t) // 得到Aq对应的协防差阵cholesky变换 num * num维
     val R = 100
     val seed = 123L
 
 
     val betaArray = weights.first(num * data.size)
     val beta = new BDM[Double](num, data.size, betaArray, 0, data.size, true) // num * p维
-
-
-    val a = Aq * beta * {
-      new BDV[Double](data.toDense.values)
-    } // (num * num) * (num * p) * (p * 1) = num * 1维
+    val a = Aq * beta * {new BDV[Double](data.toDense.values)}
 
     -scala.math.log(ToolsForMNP.smoothRecurse(R, P_triangle, a, seed) + 1E-7) // 通过MC(GHK-smooth recurse方法)求近似似然
   }
@@ -130,7 +146,7 @@ object ToolsForMNP extends Serializable {
       (Array.empty[Double], 1.0)
     else {
       require(i <= P_triangle.cols, "i不能超过矩阵的列数")
-      val tup = recurse(i - 1, P_triangle, a, rd: Random)
+      val tup = recurse(i - 1, P_triangle, a, rd: Random) // 递归
       val epsilon: Array[Double] = tup._1
       val QLikelihood: Double = tup._2
 
@@ -145,6 +161,5 @@ object ToolsForMNP extends Serializable {
       (epsilon :+ epsilon_i, QLikelihood * Q_i)
     }
   }
-
 
 }
