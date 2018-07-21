@@ -1,6 +1,6 @@
 package com.self.core.VAR.models
 
-import self.self.core.VAR.models.IntervalInfo
+import com.self.core.VAR.models.IntervalInfo
 
 /**
   * 如果是fixedLength需要输入长度信息

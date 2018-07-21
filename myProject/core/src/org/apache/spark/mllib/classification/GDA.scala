@@ -1,26 +1,6 @@
 package org.apache.spark.mllib.classification
 
-<<<<<<< HEAD
-import org.apache.spark.mllib.linalg.Vector
-import org.apache.spark.mllib.regression.{GeneralizedLinearModel, LabeledPoint}
-import org.apache.spark.mllib.util.Saveable
-import org.apache.spark.rdd.RDD
-import org.apache.spark.storage.StorageLevel
 
-/**
-  * Created by datasure on 2018-2-28.
-  */
-class GDA extends Serializable with {
-  def fit(input: RDD[LabeledPoint]) = {
-    if (input.getStorageLevel == StorageLevel.NONE) {
-      logWarning("The input data is not directly cached, which may hurt performance if its"
-        + " parent RDDs are also uncached.")
-    }
-
-
-
-
-=======
 import org.apache.spark.Logging
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
@@ -119,15 +99,11 @@ class GDA(private var predictFormat: String) extends Logging{
     scal(1.0 / (m - fi), mu0)
     scal(1.0 / fi, mu1)
     new GDAModel(fi / m, mu0, mu1, sigma, this.predictFormat)
->>>>>>> 003b90c6cf466e2b940caab8b1b450da4f73f4e5
   }
 
 
 
 }
-<<<<<<< HEAD
-=======
-
 
 class GDAModel(val fi: Double, val mu0: Vector, val mu1: Vector, val sigma: DenseMatrix,
                val predictFormat: String)
@@ -167,4 +143,3 @@ class GDAModel(val fi: Double, val mu0: Vector, val mu1: Vector, val sigma: Dens
 
 }
 
->>>>>>> 003b90c6cf466e2b940caab8b1b450da4f73f4e5

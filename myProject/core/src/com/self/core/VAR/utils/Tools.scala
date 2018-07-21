@@ -1,4 +1,4 @@
-package self.self.core.VAR.utils
+package com.self.core.VAR.utils
 
 import com.self.core.VAR.models.SlidingTime
 import org.joda.time.DateTime
