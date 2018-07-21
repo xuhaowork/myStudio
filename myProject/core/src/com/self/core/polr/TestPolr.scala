@@ -1,5 +1,7 @@
 package com.self.core.polr
 
+import com.self.core.baseApp.myAPP
+import com.self.core.polr.models.{Polr, TestData, Utils}
 import org.apache.spark.mllib.linalg.DenseVector
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
@@ -9,9 +11,19 @@ import org.apache.spark.sql.{DataFrame, Row}
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
-object TestPolr extends BaseMain{
-  def simulate() = {
+/**
+  * editor：Xuhao
+  * date： 2017/5/4 10:00:00
+  */
+
+/**
+  * 测试有序回归
+  */
+
+object TestPolr extends myAPP {
+  def simulate(): Unit = {
     val testData = TestData.testDataMeetingPoint
+    import TestData.ArrayToMatrix
     val lst = testData.toMatrixArrayByRow(500, 3)
 
     val rdd = sc.parallelize(lst).map(Row.fromSeq(_))
@@ -20,6 +32,7 @@ object TestPolr extends BaseMain{
 
     outputrdd.put("rawDataDF", rawDataDF)
   }
+
   simulate()
 
 
@@ -28,13 +41,13 @@ object TestPolr extends BaseMain{
       * 一些参数的处理
       */
     /** 0)获取基本的系统变量 */
-//    val jsonparam = "<#zzjzParam#>"
-//    val gson = new Gson()
-//    val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
-//    val parser = new JsonParser()
-//    val pJsonParser = parser.parse(jsonparam).getAsJsonObject
-//    val z1 = z
-//    val rddTableName = "<#zzjzRddName#>"
+    //    val jsonparam = "<#zzjzParam#>"
+    //    val gson = new Gson()
+    //    val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
+    //    val parser = new JsonParser()
+    //    val pJsonParser = parser.parse(jsonparam).getAsJsonObject
+    //    val z1 = z
+    //    val rddTableName = "<#zzjzRddName#>"
 
     val rawDataDF = outputrdd.get("rawDataDF").asInstanceOf[DataFrame]
     rawDataDF.show()
@@ -69,8 +82,9 @@ object TestPolr extends BaseMain{
               "a", "b", "c", "d", "e", "f", "g",
               "h", "i", "j", "k", "l", "m", "n",
               "o", "p", "q", "r", "s", "t", "u",
-              "v", "w", "x", "y", "z").zipWithIndex.map{
-              case (key, index) => (key, index.toDouble) }.toMap
+              "v", "w", "x", "y", "z").zipWithIndex.map {
+              case (key, index) => (key, index.toDouble)
+            }.toMap
             val rdd: RDD[(String, DenseVector)] = Utils.getRddIdByString(rawDataDF: DataFrame,
               idColName: String,
               idColType: String,
@@ -82,7 +96,7 @@ object TestPolr extends BaseMain{
               "a", "b", "c", "d", "e", "f", "g",
               "h", "i", "j", "k", "l", "m", "n",
               "o", "p", "q", "r", "s", "t", "u",
-              "v", "w", "x", "y", "z").zipWithIndex.map{
+              "v", "w", "x", "y", "z").zipWithIndex.map {
               case (key, index) => (key.toUpperCase(), index.toDouble)
             }.toMap
             val rdd: RDD[(String, DenseVector)] = Utils.getRddIdByString(rawDataDF: DataFrame,
@@ -94,7 +108,7 @@ object TestPolr extends BaseMain{
 
           case "meetingPoint" =>
             val categories = Array("甲", "乙", "丙", "丁").reverse
-              .zipWithIndex.map{ case (key, index) => (key, index.toDouble)}.toMap
+              .zipWithIndex.map { case (key, index) => (key, index.toDouble) }.toMap
             val rdd: RDD[(String, DenseVector)] = Utils.getRddIdByString(rawDataDF: DataFrame,
               idColName: String,
               idColType: String,
@@ -103,7 +117,7 @@ object TestPolr extends BaseMain{
             Utils.transform(sc, rdd, categories, featureCols.length)
 
           case "abcd" =>
-            val categories = Array("A", "B", "C", "D").reverse.zipWithIndex.map{
+            val categories = Array("A", "B", "C", "D").reverse.zipWithIndex.map {
               case (key, index) => (key, index.toDouble)
             }.toMap
             val rdd: RDD[(String, DenseVector)] = Utils.getRddIdByString(rawDataDF: DataFrame,
@@ -116,12 +130,12 @@ object TestPolr extends BaseMain{
 
       case "byHand" =>
         var categories: mutable.Map[String, Double] = scala.collection.mutable.Map.empty
-//        val categoryArray = gradeInfoObj.get("category").getAsJsonArray
-//        for (i <- 0 until categoryArray.size()) {
-//          val tup = (categoryArray.get(i).getAsJsonObject.get("categoryValue").getAsString.trim,
-//            i.toDouble)
-//          categories += tup
-//        }
+        //        val categoryArray = gradeInfoObj.get("category").getAsJsonArray
+        //        for (i <- 0 until categoryArray.size()) {
+        //          val tup = (categoryArray.get(i).getAsJsonObject.get("categoryValue").getAsString.trim,
+        //            i.toDouble)
+        //          categories += tup
+        //        }
 
         val rdd: RDD[(String, DenseVector)] = Utils.getRddIdByString(rawDataDF: DataFrame,
           idColName: String,
@@ -131,7 +145,7 @@ object TestPolr extends BaseMain{
         Utils.transform(sc, rdd, categories.toMap, featureCols.length)
     }
 
-    if(trainData.count() <= 1 + featureCols.length + categories.size)
+    if (trainData.count() <= 1 + featureCols.length + categories.size)
       throw new Exception("经过数据因子化（对因变量加入级别信息）后数据数量少于过度识别的数目。可能的原因是：" +
         "输入的分级信息和数据不一致导致很多数据找不到分级信息。")
 
@@ -149,16 +163,16 @@ object TestPolr extends BaseMain{
     val resultModelBC = rawDataDF.sqlContext.sparkContext.broadcast(resultModel).value
     val newRdd = trainData.map(labeledPoint =>
       (labeledPoint, resultModelBC.fit(labeledPoint.features)))
-      .map{case (labeledPoint, index) => {
+      .map { case (labeledPoint, index) => {
         labeledPoint.features.toDense.values :+ categoriesArray(labeledPoint.label.toInt) :+ categoriesArray(index)
-      }}
+      }
+      }
     newRdd.map(x => Row.fromSeq(x))
     val featureSchema = featureCols.map(x => rawDataDF.schema.apply(x._1))
     val newDataDF = rawDataDF.sqlContext.createDataFrame(
       newRdd.map(x => Row.fromSeq(x)), StructType(featureSchema :+ StructField(idColName, StringType)
         :+ StructField(idColName + "_fit", StringType)))
     newDataDF.show()
-
 
 
   }

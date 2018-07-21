@@ -2,14 +2,22 @@ package org.apache.spark.mllib.feature
 
 import org.apache.spark.mllib.linalg.{DenseMatrix, DenseVector, Matrix, Vector, Vectors}
 import org.apache.spark.mllib.linalg.distributed.RowMatrix
-import breeze.linalg.{diag, DenseMatrix => BDM, DenseVector => BDV, svd => brzSvd, max => brzMax}
-import breeze.numerics.{sqrt => brzSqrt, abs => brzAbs}
+import breeze.linalg.{diag, DenseMatrix => BDM, DenseVector => BDV, max => brzMax, svd => brzSvd}
+import breeze.numerics.{abs => brzAbs, sqrt => brzSqrt}
 import org.apache.spark.rdd.RDD
 import org.apache.spark.Logging
+import org.apache.spark.storage.StorageLevel
 import scala.math
 
 
 /**
+  * editor: xuhao
+  * date: 2018-02-10 09:00:00
+  */
+
+/**
+  * fastICA
+  * ------------
   * An algorithm for Independent Component Analysis.
   * Which can be refer to :
   * [1]'A. Hyvarinen and E. Oja (2000) Independent Component
@@ -21,9 +29,8 @@ import scala.math
 /** Generally speaking:
   * We assume that the data is X with dims of N*n,what we want is to find a
   * matrix A and S with dims of N*m, A*S = X. The latent data of S is component
---------------------------------------------------------------------------------
+  * ------------
   * of n variables which is nonGaussian.
-  *
   * First we need to white X to Z, assume that E(x*t(x)) = E*D*E, then
   * Z = `E {D}-1 E`.
   *
@@ -43,6 +50,8 @@ import scala.math
   *   w := E{xg(w'*x)} - E{g'(w'*x)}*w;
   *   w = w / ||w||.
   */
+
+
 class fastICA(private var componetNums: Int, private var alpha: Double,
               private var threshold: Double, private var sampleFraction: Double,
               private var seed: Long, private var maxIterations: Double,
@@ -61,7 +70,7 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
 
   def setAlpha(alpha: Double): this.type = {
     if(alpha <= 0.0)
-     logError("Alpha should be positive number.")
+      logError("Alpha should be positive number.")
     if(alpha < 1 || alpha > 2)
       logWarning("Alpha is suggested to be between 1.0 and 2.0")
     this.alpha = alpha
@@ -118,12 +127,18 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
   /** Transform the matrix to a matrix with zero means. Used in whiteMatrix. */
   private def standardWithMean(matrix: RowMatrix)
   : RowMatrix = {
-    val mean = matrix.computeColumnSummaryStatistics().mean.toArray
+    val statisticMpdel = matrix.computeColumnSummaryStatistics()
+
+    val mean = statisticMpdel.mean.toArray
+    val sd = statisticMpdel.variance.toArray.map(math.sqrt)
+
     val meanBC = matrix.rows.context.broadcast(mean)
+    val sdBC = matrix.rows.context.broadcast(sd)
     val result = matrix.rows.mapPartitions(iter =>
       iter.map(v => {
         val bv = v.toArray.zip(meanBC.value)
           .map{case (e, means) => e - means}
+        bv.zip(sdBC.value).map{case (v, sd) => v / sd}
         Vectors.dense(bv)
       })
     )
@@ -142,8 +157,14 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
     (new RowMatrix(zMatrix), whiteMatrix)
   }
 
+
   /** The main function of ICA. */
   def fit(rddVector: RDD[Vector]): ICAModel = {
+    if (rddVector.getStorageLevel == StorageLevel.NONE) {
+      logWarning("The input data is not directly cached, which may hurt performance" +
+        " if its parent RDDs are also uncached.")
+    }
+
     val xMatrix: RowMatrix = new RowMatrix(rddVector)
     val colNums = xMatrix.numCols()
     val rowNums = xMatrix.numRows()
@@ -163,9 +184,9 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
     val rdn = new java.util.Random(this.seed)
     val m: Int = this.componetNums
 
-    val initMatrix = orthogonalize(BDM.tabulate(m, p)((i, j) => rdn.nextDouble()))
-
+    val initMatrix = orthogonalize(BDM.tabulate(m, p)((_, _) => rdn.nextDouble()))
     val initialWeight: Matrix = new DenseMatrix(initMatrix.rows, initMatrix.cols, initMatrix.data)
+
     var W_old = initialWeight.copy
     var W = initialWeight.copy
 
@@ -173,11 +194,12 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
     var i = 0
 
     // Iterations.
+    val alphaN = this.alpha
     while(flag && i < maxIterations) {
       val WUpdate: RDD[Array[Double]] = zMatrix.rows.map(v => {
-        val gwz = W.multiply(v).values.map(math.tanh)
+        val gwz = W.multiply(v).values.map(d => math.tanh(alphaN * d))
         val egwz = gwz.flatMap(d => v.toArray.map(_ * d))
-        val dgwz = gwz.map(d => 1 - d * d)
+        val dgwz = gwz.map(d => 1 - alphaN * d * d)
         val wdgwz = Array.tabulate(W.numCols * W.numRows)(i => {
           val rowId = i / W.numCols
           val colId = i % W.numCols
@@ -186,6 +208,7 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
         egwz.zip(wdgwz).map { case (e1, e2) => e1 - e2 }
       })
 
+      /** Estimation of the expectation. */
       val expectation4WUpdate = EStep(WUpdate: RDD[Array[Double]], sampleFraction,
         seed, W.numCols * W.numRows)
 
@@ -193,12 +216,13 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
       val orthogonalMatrix = orthogonalize(newW)
 
       // judge
+      W = new DenseMatrix(orthogonalMatrix.rows, orthogonalMatrix.cols, orthogonalMatrix.data)
       val multiMatrix = W_old.toBreeze.asInstanceOf[BDM[Double]] * orthogonalMatrix.t
+
       val v = brzMax(brzAbs(diag(multiMatrix)))
       if (v <= threshold) {
         flag = false
       } else {
-        W = new DenseMatrix(orthogonalMatrix.rows, orthogonalMatrix.cols, orthogonalMatrix.data)
         W_old = W.copy
       }
 
@@ -224,8 +248,15 @@ class fastICA(private var componetNums: Int, private var alpha: Double,
 
 
   def orthogonalize(G: BDM[Double]): BDM[Double] = {
-    val brzSvd.SVD(u, s, _) = brzSvd(G.t * G)
-    val recSqrtVector = BDV.fill(s.length)(1.0) :/ brzSqrt(s)
+    /** test */
+    println(G.data.mkString(","))
+    val brzSvd.SVD(u, s, _) =
+      try{
+        brzSvd(G.t * G)
+      }catch{
+        case e: Exception => throw new Exception("svd Error.")
+      }
+    val recSqrtVector = BDV.fill(s.length)(1.0) :/ (brzSqrt(s) + 1e-5)
     val recSqrtMatrix = u * diag(recSqrtVector) * u.t
     G * recSqrtMatrix
   }
