@@ -1,12 +1,9 @@
 package com.self.core.KLInfoMethod
 
 import com.self.core.baseApp.myAPP
-import com.self.core.KLInfoMethod.models.KLInfoTools
-import com.self.core.KLInfoMethod.models.KLMeta
+import com.self.core.KLInfoMethod.models.{KLInfoTools, KLMeta, LagInfo, LagInfoForPartition}
 import com.self.core.featurePretreatment.utils.Tools
 import org.apache.spark.rdd.RDD
-
-import scala.collection.mutable.ArrayBuffer
 
 object KLInfoTest extends myAPP {
   override def run(): Unit = {
@@ -176,6 +173,8 @@ object KLInfoTest extends myAPP {
     val referenceVariable = "工业增加值同比"
     val variables = Array("轻工业同比", "重工业同比", "工业增加值环比", "轻工业环比", "重工业环比", "M0", "M1", "M2")
 
+    val numFeatures = variables.length
+
 
     /** KL进行的范围 */
     val range = 18
@@ -207,34 +206,130 @@ object KLInfoTest extends myAPP {
         require(reference >= 0.0, s"因为KL算法是将两个序列作为分布，因此需要数据大于等于0.0，但您的数据中出现了$reference")
 
         KLMeta(reference, observes)
-    }
+    }.repartition(10)
 
     rdd.cache()
 
-    /** 求出各种掐头去尾的和，用于后面的归一化 */
-    val sumDict = KLInfoTools.getSum(rdd, variables.length, Range(-range, range))
 
-    /** 求出每个分区的前后min(range, elementNum)个基准变量的元素 */
-    val sidesElements = rdd.mapPartitionsWithIndex {
+    /** 求出各种掐头去尾的和，用于后面的归一化  @return 滞后阶数 -> 求和 */
+    val sumDict: Map[Int, KLMeta] = KLInfoTools.getSum(rdd, variables.length, Range(-range, range))
+
+    sumDict.foreach{case (key, kl) => println("key:", key, kl.refResult, kl.varResult.mkString(","))}
+
+    /** 求出每个分区的前后min(range, elementNum)个基准变量的元素 @return 分区id -> 先期滞后信息 */
+    val sidesElements: collection.Map[Int, (LagInfoForPartition, Int)] = rdd.mapPartitionsWithIndex {
       case (idx, values) =>
-        val takeNum = scala.math.min(values.length, range)
-        val headerElements = values.take(takeNum).toArray
-        val tailElements = values.toSeq.takeRight(takeNum).toArray
-        Array((idx, (headerElements, tailElements))).toIterator
+        val arr = values.toArray
+        val takeNum = scala.math.min(arr.length, range)
+        val headerElements = arr.map(_.refResult).take(takeNum)
+        val tailElements = arr.map(_.refResult).takeRight(takeNum)
+        Array((idx, (LagInfoForPartition(headerElements, tailElements), arr.length))).toIterator
     }.collectAsMap()
-    rdd.mapPartitionsWithIndex {
-      case (idx, _) =>
-        Array(idx).toIterator
-    }.foreach(println)
-
-    sumDict.foreach(println)
-
-//    sidesElements.foreach(println)
-
-    /** 变量静止不动，基准变量进行先期滞后移动，获得KL统计信息量 */
 
 
+    //    val sidesElements: collection.Map[Int, (LagInfoForPartition, Int)] = collection.Map(0 -> (LagInfoForPartition(Array(0.0), Array(1.0)), 50))
+    //    sidesElements.foreach(println)
 
+
+    val headTailInfo: LagInfo = sc.broadcast(new LagInfo(sidesElements.mapValues(_._1).map(identity), sidesElements.mapValues(_._2).map(identity), range, range)).value
+
+
+    /** 获得KL每种先期滞后阶数的每条记录统计信息量 */
+    val klMap = rdd.mapPartitionsWithIndex {
+      case (idx, valuesIter) =>
+        val values = valuesIter.toArray
+        // 掐头去尾留中间，这里按最大的先期滞后变量获取能够进行转换的分区id
+        if (idx > headTailInfo.lastPartitionNumCanLag || idx < headTailInfo.leastPartitionNumCanLead) {
+          var m = Map.empty[Int, Array[Array[Double]]]
+          Array.range(0, range).foreach { i => // todo:这里算法还需要针对每个移动设定一个lastPartitionNumCanLag或leastPartitionNumCanLead
+            if (headTailInfo.numsForPartitions(idx) > i) {
+              val refVal: Array[Double] = values.map(_.refResult).drop(i)
+//                .copyToArray().dropRight(i)
+
+              println("ref", refVal.mkString(","))
+              val variables: Array[Array[Double]] = values.drop(i).map(_.varResult)
+              println("variables", variables.map(_.mkString(",")).mkString("|"))
+
+              val sumForIndex = sumDict(headTailInfo.rangeForHead - 1 - i) // 求出对应的求和，注意sliding效果是倒叙
+
+              val kll = refVal.zip(variables).map {
+                case (ref, other) =>
+                  (KLMeta(ref, other) / sumForIndex).KL // 是一个Array形式，每个位置对应相应变量的KL信息量
+              }
+//              println("kll", kll.map(arr => arr.mkString(",")).mkString("|"))
+
+              m += i -> kll
+            }
+          }
+
+
+          //          val u = m.toArray.flatMap { case (key, klValues) => klValues.map(klValue => Map(key -> klValue)) }
+          val u = m.toArray.map {
+            case (key, v) =>
+              (key, if (v.isEmpty) Array.fill(numFeatures)(0.0) else v.reduce((k1, k2) => k1.zip(k2).map { case (v1, v2) => v1 + v2 }))
+          }
+
+          Array(u).toIterator
+        } else {
+          val refVal = try {
+            headTailInfo.headKAfterPartitionP(idx) ++ values.map(_.refResult) ++ headTailInfo.tailKBeforePartitionP(idx)
+          } catch {
+            case e: Exception => throw new Exception(s"在分区${idx}中获取前后若干元素时失败, 具体信息${e.getMessage}")
+          }
+
+          val variablesVal: Array[Array[Double]] = values.map(_.varResult).toArray
+          val numsForPartitions = headTailInfo.numsForPartitions(idx) // 分区内的元素个数
+
+          /** 先求所有变量的滞后KL：
+            * 参照变量按相反方向移动 -- 先期
+            * 滞后阶数 -> 每条记录[每个特征[KL信息量] ] */
+          val m: Map[Int, Array[Array[Double]]] = refVal.take(numsForPartitions + headTailInfo.rangeForHead).sliding(numsForPartitions).zipWithIndex // 前面
+            .map {
+            case (arr, index) =>
+              val sumForIndex = sumDict(headTailInfo.rangeForHead - 1 - index) // 求出对应的求和，注意sliding效果是倒叙
+              (index, arr.zip(variablesVal).map {
+                case (ref, other) =>
+                  (KLMeta(ref, other) / sumForIndex).KL // 是一个Array形式，每个位置对应相应变量的KL信息量
+              }) // 归一化并求出KL散度
+          }.toMap
+
+          val u = m.toArray.map {
+            case (key, v) =>
+              (key, if (v.isEmpty) Array.fill(numFeatures)(0.0) else v.reduce((k1, k2) => k1.zip(k2).map { case (v1, v2) => v1 + v2 }))
+          }
+          //          val u = m.toArray.flatMap { case (key, klValues) => klValues.map(klValue => Map(key -> klValue)) }
+          //            .values.toArray.flatten
+
+
+          Array(u).toIterator
+        }
+    }
+
+    klMap.collect()
+
+
+    klMap.foreach(m => m.map(arr => println(arr._2.mkString(","))))
+
+
+
+
+
+
+
+    //    val klResult: Map[Int, Array[Double]] = klMap.reduce {
+    //      case (map1, map2) =>
+    //        map1.map {
+    //          case (key, value) =>
+    //            val newValue = if (map2.get(key).isEmpty)
+    //              value
+    //            else {
+    //              map2(key).zip(value).map { case (v1, v2) => v1 + v2 }
+    //            }
+    //            (key, newValue)
+    //        }
+    //    }
+    //
+    //    klResult.foreach(println)
 
 
   }
