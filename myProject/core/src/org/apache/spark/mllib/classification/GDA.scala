@@ -1,5 +1,6 @@
 package org.apache.spark.mllib.classification
 
+
 import org.apache.spark.Logging
 import org.apache.spark.mllib.regression.LabeledPoint
 import org.apache.spark.rdd.RDD
@@ -103,7 +104,6 @@ class GDA(private var predictFormat: String) extends Logging{
 
 
 }
-
 
 class GDAModel(val fi: Double, val mu0: Vector, val mu1: Vector, val sigma: DenseMatrix,
                val predictFormat: String)
