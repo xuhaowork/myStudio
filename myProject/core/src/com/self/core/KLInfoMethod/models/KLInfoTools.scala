@@ -167,7 +167,7 @@ object KLInfoTools extends Serializable {
           val multiplier = if (mv >= 0) {
             if (tup._1 - mv > 0) 1.0 else 0.0
           } else {
-            if (tup._1 - count - mv >= 0) 1.0 else 0.0
+            if (tup._1 - count - mv <= 0) 1.0 else 0.0
           }
           (mv, result1 + tup._2 * multiplier)
       }
