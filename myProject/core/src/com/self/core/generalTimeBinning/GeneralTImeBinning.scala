@@ -1,9 +1,11 @@
 package com.self.core.generalTimeBinning
 
 import java.sql.Timestamp
+import java.time.LocalDate
 
 import com.self.core.baseApp.myAPP
 import com.self.core.generalTimeBinning.models._
+import org.joda.time._
 
 object GeneralTImeBinning extends myAPP {
   val testData1 = Array(
@@ -96,7 +98,15 @@ object GeneralTImeBinning extends myAPP {
 
   override def run(): Unit = {
     /** 通过单条数据测试 */
-    testSingle() // 测试一下解析器
+//    testSingle() // 测试一下
+
+
+
+
+
+
+
+
 
 
     //    /** 先通过rdd看看到底核心的数据流转需要什么类型工程结构，形成较为清晰的需求 */

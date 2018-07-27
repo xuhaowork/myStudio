@@ -1,7 +1,7 @@
 package com.self.core.generalTimeBinning.models
 
 import com.self.core.generalTimeBinning.tools.Utils
-import org.joda.time.{DateTime, DateTimeZone}
+import org.joda.time._
 
 /**
   * 分箱时间
@@ -44,6 +44,8 @@ import org.joda.time.{DateTime, DateTimeZone}
   * @param deep       深度
   * @param position   结点是左节点、右结点还是根节点的一个标志 -1代表是父节点的左节点，0代表是原数据，1代表是右结点
   */
+
+// @todo 或许树形结构有点冗余，因为最多只有一个子结点为非叶节点，装饰着模式或许更适合，后面有时间改一下
 private[generalTimeBinning] class BinningTime(
                                                var element: TimeMeta, // 不变
                                                var leftChild: Option[BinningTime], // 会变
@@ -51,7 +53,7 @@ private[generalTimeBinning] class BinningTime(
                                                var isLeaf: Boolean,
                                                var deep: Int,
                                                var position: Int = 0
-                                             ) extends Serializable { // @todo 基本做完后才发现使用装饰着模式要比树结构更合适，后面有机会改一下
+                                             ) extends Serializable {
   /**
     * 构建一个新的BinningTime
     *
@@ -107,32 +109,6 @@ private[generalTimeBinning] class BinningTime(
       }
     }
 
-  //  def updateAllVariables(tipNode: BinningTime): this.type = {
-  //    this.element = tipNode.element
-  //    this.leftChild = tipNode.leftChild
-  //    this.rightChild = tipNode.rightChild
-  //    this.isLeaf = tipNode.isLeaf
-  //    this.deep = tipNode.deep
-  //    this.position = tipNode.position
-  //    this
-  //  }
-
-  //  def updateTipNode(tipNode: BinningTime, getLeftNode: Boolean): this.type = {
-  //    if (this.isLeaf) {
-  //      updateAllVariables(tipNode)
-  //    } else if (!this.leftChild.get.isLeaf) {
-  //      this.leftChild.get.updateTipNode(tipNode, getLeftNode)
-  //    } else if (!this.rightChild.get.isLeaf) {
-  //      this.rightChild.get.updateTipNode(tipNode, getLeftNode)
-  //    } else {
-  //      if (getLeftNode)
-  //        this.leftChild.get.updateAllVariables(tipNode)
-  //      else
-  //        this.rightChild.get.updateAllVariables(tipNode)
-  //    }
-  //    this
-  //  }
-
 
   private def getString: String =
     if (deep == 0) {
@@ -171,6 +147,75 @@ private[generalTimeBinning] class BinningTime(
     tipNode.setRightChild(new BinningTime(residue, None, None, true, tipNode.deep + 1, 1))
     this
   }
+
+
+  /** 按时间长度分箱，一个分箱时间一个剩余时间 */
+  private def binningByUnit(timeBinnerInfo: TimeBinnerInfoByUnit): this.type = {
+    val tipNode = getTipNode(timeBinnerInfo.left)
+
+    val phase = timeBinnerInfo.phase // 相位
+    val window = timeBinnerInfo.window // 时长
+    val unit = timeBinnerInfo.unit
+
+    val phase_dt = new DateTime(phase).withZone(DateTimeZone.forID("UTC"))
+    val value_dt = new DateTime(tipNode.element).withZone(DateTimeZone.forID("UTC"))
+
+    val new_value_dt = unit match {
+      case "year" =>
+        val period = new Period(value_dt, phase_dt, PeriodType.years())
+        value_dt.plusDays((period.getYears / window * window.toInt).toInt)
+
+      case "month" =>
+        val period = new Period(value_dt, phase_dt, PeriodType.months())
+        value_dt.plusDays((period.getMonths / window * window.toInt).toInt)
+
+      case "week" =>
+        val period = new Period(value_dt, phase_dt, PeriodType.weeks())
+        value_dt.plusDays((period.getWeeks / window * window.toInt).toInt)
+
+      case "day" =>
+        val period = new Period(value_dt, phase_dt, PeriodType.days())
+        value_dt.plusDays((period.getDays / window * window.toInt).toInt)
+
+      case "hour" =>
+        val period = new Period(value_dt, phase_dt, PeriodType.hours())
+        value_dt.plusDays((period.getHours / window * window.toInt).toInt)
+
+      case "minute" =>
+        val period = new Period(value_dt, phase_dt, PeriodType.minutes())
+        value_dt.plusDays((period.getMinutes / window * window.toInt).toInt)
+
+      case "second" =>
+        val period = new Period(value_dt, phase_dt, PeriodType.seconds())
+        value_dt.plusDays((period.getSeconds / window * window.toInt).toInt)
+
+      case "millisecond" =>
+        val period = new Period(value_dt, phase_dt, PeriodType.millis())
+        value_dt.plusDays((period.getMillis / window * window.toInt).toInt)
+
+      case _ =>
+        throw new Exception("您输入的时间单位有误: 目前只能是year/month/week/hour/minute/second/millisecond之一")
+
+    }
+
+    val relativeMillis = new Period(value_dt, new_value_dt, PeriodType.millis()).getMillis
+
+
+
+    val newValue = scala.math.floor((tipNode.element.value - phase) / window.toDouble).toLong * window + phase
+
+    val binningResult = tipNode.element.update(newValue, Some(newValue + window)) // 分箱时间，沿用之前的timeFormat
+    val residueResult = tipNode.element.value - newValue
+    val adaptFormat4Residue = Utils.adaptTimeFormat(window)
+    val residue = new RelativeMeta(residueResult, None, adaptFormat4Residue) // 剩余时间
+
+    /** 将分箱结果分别装在左右结点中 */
+    tipNode.setLeftChild(new BinningTime(binningResult, None, None, true, tipNode.deep + 1, -1))
+    tipNode.setRightChild(new BinningTime(residue, None, None, true, tipNode.deep + 1, 1))
+    this
+  }
+
+
 
   /** 分箱 */
   def binning(timeBinnerInfo: TimeBinnerInfo): this.type = {
@@ -239,7 +284,6 @@ private[generalTimeBinning] class RelativeMeta(
 
   override def update(value: Long, rightBound: Option[Long]): TimeMeta =
     new RelativeMeta(value, rightBound, timeFormat)
-
 
   override def toString: String = {
     var str = new DateTime(value).withZone(DateTimeZone.forID("UTC")).toString(timeFormat)
