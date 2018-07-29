@@ -85,7 +85,7 @@ object GeneralTImeBinning extends myAPP {
 
     val phase3: Long = {
       val time1 = "0:0:0"
-      new java.text.SimpleDateFormat(timeFormat).parse(time1).getTime
+      new java.text.SimpleDateFormat("HH:mm:ss").parse(time1).getTime
     }
     val binningInfo3Grade = new TimeBinnerInfoByLength(phase, 10 * 60 * 1000, false) // 对剩余时间继续分箱
 
@@ -98,7 +98,7 @@ object GeneralTImeBinning extends myAPP {
 
   override def run(): Unit = {
     /** 通过单条数据测试 */
-//    testSingle() // 测试一下
+    testSingle() // 测试一下
 
 
 

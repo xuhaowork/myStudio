@@ -160,54 +160,48 @@ private[generalTimeBinning] class BinningTime(
     val phase_dt = new DateTime(phase).withZone(DateTimeZone.forID("UTC"))
     val value_dt = new DateTime(tipNode.element).withZone(DateTimeZone.forID("UTC"))
 
-    val new_value_dt = unit match {
+    val (new_value_dt, right_bound_dt) = unit match {
       case "year" =>
         val period = new Period(value_dt, phase_dt, PeriodType.years())
-        value_dt.plusDays((period.getYears / window * window.toInt).toInt)
-
+        (value_dt.plusYears((period.getYears / window * window.toInt).toInt),
+          value_dt.plusYears((period.getYears / window * window.toInt).toInt + window.toInt))
       case "month" =>
         val period = new Period(value_dt, phase_dt, PeriodType.months())
-        value_dt.plusDays((period.getMonths / window * window.toInt).toInt)
-
+        (value_dt.plusMonths((period.getMonths / window * window.toInt).toInt),
+          value_dt.plusMonths((period.getMonths / window * window.toInt).toInt + window.toInt))
       case "week" =>
         val period = new Period(value_dt, phase_dt, PeriodType.weeks())
-        value_dt.plusDays((period.getWeeks / window * window.toInt).toInt)
-
+        (value_dt.plusWeeks((period.getWeeks / window * window.toInt).toInt),
+          value_dt.plusWeeks((period.getWeeks / window * window.toInt).toInt + window.toInt))
       case "day" =>
         val period = new Period(value_dt, phase_dt, PeriodType.days())
-        value_dt.plusDays((period.getDays / window * window.toInt).toInt)
-
+        (value_dt.plusDays((period.getDays / window * window.toInt).toInt),
+          value_dt.plusDays((period.getDays / window * window.toInt).toInt + window.toInt))
       case "hour" =>
         val period = new Period(value_dt, phase_dt, PeriodType.hours())
-        value_dt.plusDays((period.getHours / window * window.toInt).toInt)
-
+        (value_dt.plusHours((period.getHours / window * window.toInt).toInt),
+          value_dt.plusHours((period.getHours / window * window.toInt).toInt + window.toInt))
       case "minute" =>
         val period = new Period(value_dt, phase_dt, PeriodType.minutes())
-        value_dt.plusDays((period.getMinutes / window * window.toInt).toInt)
-
+        (value_dt.plusMinutes((period.getMinutes / window * window.toInt).toInt),
+          value_dt.plusMinutes((period.getMinutes / window * window.toInt).toInt + window.toInt))
       case "second" =>
         val period = new Period(value_dt, phase_dt, PeriodType.seconds())
-        value_dt.plusDays((period.getSeconds / window * window.toInt).toInt)
-
+        (value_dt.plusSeconds((period.getSeconds / window * window.toInt).toInt),
+          value_dt.plusSeconds((period.getSeconds / window * window.toInt).toInt + window.toInt))
       case "millisecond" =>
         val period = new Period(value_dt, phase_dt, PeriodType.millis())
-        value_dt.plusDays((period.getMillis / window * window.toInt).toInt)
-
+        (value_dt.plusMillis((period.getMillis / window * window.toInt).toInt),
+          value_dt.plusMillis((period.getMillis / window * window.toInt).toInt + window.toInt))
       case _ =>
         throw new Exception("您输入的时间单位有误: 目前只能是year/month/week/hour/minute/second/millisecond之一")
-
     }
 
+    val binningResult = tipNode.element.update(new_value_dt.getMillis, Some(right_bound_dt.getMillis))
     val relativeMillis = new Period(value_dt, new_value_dt, PeriodType.millis()).getMillis
 
-
-
-    val newValue = scala.math.floor((tipNode.element.value - phase) / window.toDouble).toLong * window + phase
-
-    val binningResult = tipNode.element.update(newValue, Some(newValue + window)) // 分箱时间，沿用之前的timeFormat
-    val residueResult = tipNode.element.value - newValue
-    val adaptFormat4Residue = Utils.adaptTimeFormat(window)
-    val residue = new RelativeMeta(residueResult, None, adaptFormat4Residue) // 剩余时间
+    val adaptFormat4Residue = Utils.adaptTimeFormat(relativeMillis)
+    val residue = new RelativeMeta(relativeMillis, None, adaptFormat4Residue) // 剩余时间
 
     /** 将分箱结果分别装在左右结点中 */
     tipNode.setLeftChild(new BinningTime(binningResult, None, None, true, tipNode.deep + 1, -1))
