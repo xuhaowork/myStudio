@@ -209,16 +209,15 @@ private[generalTimeBinning] class BinningTime(
     this
   }
 
-
-
   /** 分箱 */
   def binning(timeBinnerInfo: TimeBinnerInfo): this.type = {
     timeBinnerInfo match {
       case byLth: TimeBinnerInfoByLength =>
         binningByLength(byLth)
         this
-      case _: TimeBinnerInfoByUnit =>
-        throw new Exception("暂时只支持等宽分箱")
+      case byUnit: TimeBinnerInfoByUnit =>
+        binningByUnit(byUnit)
+        this
     }
   }
 
