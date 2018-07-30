@@ -23,6 +23,7 @@ object testBaseApp extends myAPP{
 
 
 
+
 //    // Test SparkContext.
 //    val rdd = sc.parallelize((1 to 100).toList)
 //    val rdd_sum = rdd.reduce(_ + _)
