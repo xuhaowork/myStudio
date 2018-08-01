@@ -1,8 +1,8 @@
 package com.self.core.generalTimeBinner.models
 
-import com.self.core.generalTimeBinning.tools.Utils
+import com.self.core.generalTimeBinner.tools.Utils
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
+import org.apache.spark.sql.catalyst.expressions.{BaseGenericInternalRow, GenericInternalRow, GenericMutableRow}
 import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.types._
 import org.joda.time._
@@ -41,12 +41,13 @@ import org.joda.time._
   * // toString: 原数据:{"2017-10-10 11:23:45"},第1次分箱结果:{"2017-10-10 10:00:00"},第1次分箱剩余:"01:23:45"},
   * 第2次分箱结果:{"01:00:00"},第2次分箱剩余:"00:23:45"}
   *
-  * @param element    原值
-  * @param leftChild  左子节点  --是取整（分箱后）的结果
-  * @param rightChild 右子节点  --是取模后的结果
-  * @param isLeaf     是否是叶节点，如果是叶节点则没有左子节点也没有右子节点，同时指针没有意义
-  * @param deep       深度
-  * @param position   结点是左节点、右结点还是根节点的一个标志 -1代表是父节点的左节点，0代表是原数据，1代表是右结点
+  * @param element        原值
+  * @param leftChild      左子节点  --是取整（分箱后）的结果
+  * @param rightChild     右子节点  --是取模后的结果
+  * @param isLeaf         是否是叶节点，如果是叶节点则没有左子节点也没有右子节点，同时指针没有意义
+  * @param deep           深度
+  * @param position       结点是左节点、右结点还是根节点的一个标志 -1代表是父节点的左节点，0代表是原数据，1代表是右结点
+  * @param parentPosition 是父节点的position，根节点为0，同时其两个子节点也为0
   */
 
 // @todo 或许树形结构有点冗余，因为最多只有一个子结点为非叶节点，装饰着模式或许更适合，后面有时间改一下
@@ -57,14 +58,15 @@ class BinningTime(
                    var rightChild: Option[BinningTime],
                    var isLeaf: Boolean,
                    var deep: Int,
-                   var position: Int = 0
+                   var position: Int = 0,
+                   var parentPosition: Int = 0
                  ) extends Serializable {
   /**
     * 构建一个新的BinningTime
     *
     * @param element 构建BinningTime用的时间
     */
-  def this(element: TimeMeta) = this(element, None, None, true, 0, 0)
+  def this(element: TimeMeta) = this(element, None, None, true, 0, 0, 0)
 
 
   def deepCopy: BinningTime = {
@@ -74,13 +76,21 @@ class BinningTime(
       this.rightChild,
       this.isLeaf,
       this.deep: Int,
-      this.position)
+      this.position,
+      this.parentPosition
+    )
+  }
+
+  def setParentPosition(position: Int): this.type = {
+    this.parentPosition = position
+    this
   }
 
 
   def setLeftChild(child: BinningTime): this.type = {
     this.leftChild = Some(child)
     child.setPosition(-1)
+    child.setParentPosition(position) // 记录下父节点的位置
     this.isLeaf = false
     this
   }
@@ -88,6 +98,7 @@ class BinningTime(
   def setRightChild(child: BinningTime): this.type = {
     this.rightChild = Some(child)
     child.setPosition(1)
+    child.setParentPosition(position) // 记录下父节点的位置
     this.isLeaf = false
     this
   }
@@ -134,39 +145,23 @@ class BinningTime(
     }
 
 
-  private def castInfoToTuple: (TimeMeta, Int, Int) = {
-    (element, deep, position)
+  private def castInfoToTuple: (TimeMeta, Int, Int, Int) = {
+    (element, deep, position, parentPosition)
   }
 
-  def castAllInfoToArray: Array[(TimeMeta, Int, Int)] =
-    if (this.isLeaf) {
+  /** element, deep, position, parentPosition */
+  def castAllInfoToArray: Array[(TimeMeta, Int, Int, Int)] =
+    if (isLeaf) {
       Array(castInfoToTuple)
-    } else if (!this.leftChild.get.isLeaf) {
-      val arr = this.leftChild.get.castAllInfoToArray
-      arr ++ Array(this.rightChild.get.castInfoToTuple this.castInfoToTuple
-
-    } else if (!this.rightChild.get.isLeaf) {
-      this.rightChild.get.getTipNode(getLeftNode)
+    } else if (!leftChild.get.isLeaf) {
+      val arr = leftChild.get.castAllInfoToArray
+      arr ++ Array(rightChild.get.castInfoToTuple, castInfoToTuple)
+    } else if (!rightChild.get.isLeaf) {
+      val arr = rightChild.get.castAllInfoToArray
+      arr ++ Array(leftChild.get.castInfoToTuple, castInfoToTuple)
     } else {
-      if (getLeftNode) {
-        this.leftChild.get
-      } else {
-        this.rightChild.get
-      }
+      Array(castInfoToTuple) ++ leftChild.get.castAllInfoToArray ++ rightChild.get.castAllInfoToArray
     }
-
-
-
-
-//    if (this.isLeaf) {
-//      Array(castInfoToTuple)
-//    } else if (this.leftChild.isDefined) {
-//      val arr = this.leftChild.get.castAllInfoToArray
-//      arr :+ this.castInfoToTuple
-//    } else {
-//      val arr = this.rightChild.get.castAllInfoToArray
-//      arr :+ this.castInfoToTuple
-//    }
 
 
   /** 分箱函数 */
@@ -310,59 +305,58 @@ class BinningTime(
 
 }
 
-import org.apache.spark.sql.types.ArrayType
 
 class BinningTimeUDT extends UserDefinedType[BinningTime] {
-  override def sqlType: DataType = StructType(Seq(
-    StructField("element", new TimeMetaUDT, nullable = false),
-    StructField("leftChild", new BinningTimeUDT, nullable = true),
-    StructField("rightChild", new BinningTimeUDT, nullable = true),
-    StructField("isLeaf", BooleanType, nullable = false),
-    StructField("deep", IntegerType, nullable = false),
-    StructField("position", IntegerType, nullable = false)
-  ))
+  override def sqlType: DataType = ArrayType(
+    StructType(Seq(
+      StructField("element",
+        StructType(Seq(
+          StructField("type", ByteType, nullable = false),
+          StructField("value", LongType, nullable = false),
+          StructField("rightBound", LongType, nullable = true), // 可以为空
+          StructField("timeFormat", ArrayType(IntegerType, containsNull = false), nullable = false)
+        ))
+        , false),
+      StructField("deep", IntegerType, false),
+      StructField("position", IntegerType, false),
+      StructField("parentPosition", IntegerType, false))
+    )
+  )
 
-  override def serialize(obj: Any): InternalRow = obj match {
+
+  override def serialize(obj: Any): GenericArrayData = obj match {
     case bt: BinningTime =>
-      val row = new GenericMutableRow(6)
-      row.update(0, bt.element)
-      if (bt.leftChild.isDefined)
-        row.update(1, bt.leftChild.get)
-      else
-        row.setNullAt(1)
-
-      if (bt.rightChild.isDefined)
-        row.update(2, bt.rightChild.get)
-      else
-        row.setNullAt(2)
-
-      row.setBoolean(3, bt.isLeaf)
-      row.setInt(4, bt.deep)
-      row.setInt(5, bt.position)
-      row
+      val arr: Array[(TimeMeta, Int, Int, Int)] = bt.castAllInfoToArray
+      new GenericArrayData(arr.map {
+        case (element, deep, position, parentPosition) =>
+          val row = new GenericMutableRow(4)
+          val elObj = Utils.serializeForTimeMeta(element)
+          row.update(0, elObj)
+          row.setInt(1, deep)
+          row.update(2, position)
+          row.update(3, parentPosition)
+          row
+      })
     case _ =>
       throw new Exception("您输入类型不是TimeMeta在spark sql中没有预定义的序列化方法")
   }
 
   override def deserialize(datum: Any): BinningTime = {
     datum match {
-      case row: InternalRow =>
-        val element: TimeMeta = row.get(0, new TimeMetaUDT).asInstanceOf[TimeMeta]
-        val leftChild: Option[BinningTime] =
-          if (row.isNullAt(1))
-            None
-          else
-            Some(row.get(1, new BinningTimeUDT).asInstanceOf[BinningTime])
-        val rightChild: Option[BinningTime] =
-          if (row.isNullAt(2))
-            None
-          else
-            Some(row.get(2, new BinningTimeUDT).asInstanceOf[BinningTime])
-        val isLeaf: Boolean = row.getBoolean(3)
-        val deep: Int = row.getInt(4)
-        val position: Int = row.getInt(5)
-
-        new BinningTime(element, leftChild, rightChild, isLeaf, deep, position)
+      case arr: GenericArrayData =>
+        val values = arr.array
+          .map(_.asInstanceOf[BaseGenericInternalRow])
+        val arrV = values.map {
+          row =>
+            val internalRow = row.getStruct(0, 4)
+            val element = Utils.deserializeForTimeMeta(internalRow)
+//            deep, position, parentPosition
+            val deep = row.getInt(1)
+            val position = row.getInt(2)
+            val parentPosition = row.getInt(3)
+            (element, deep, position, parentPosition)
+        }
+        Utils.reConstruct(arrV)
     }
   }
 
@@ -445,7 +439,6 @@ private[generalTimeBinner] class RelativeMeta(
 
   override def toString: String = {
     val dt = new DateTime(value).withZone(DateTimeZone.UTC)
-    println(dt, dt.getZone)
     var str = new DateTime(value).withZone(DateTimeZone.UTC).toString(timeFormat)
     if (rightBound.isDefined)
       str += "," + new DateTime(rightBound.get).withZone(DateTimeZone.UTC).toString(timeFormat)
@@ -463,47 +456,9 @@ class TimeMetaUDT extends UserDefinedType[TimeMeta] {
     StructField("timeFormat", ArrayType(IntegerType, containsNull = false), nullable = false)
   ))
 
-  override def serialize(obj: Any): InternalRow = obj match {
-    case absMT: AbsTimeMeta =>
-      val row = new GenericMutableRow(4)
-      row.setByte(0, 0)
-      row.setLong(1, absMT.value)
-      if (absMT.rightBound.isDefined)
-        row.setLong(2, absMT.rightBound.get)
-      else
-        row.setNullAt(2)
-      absMT.timeFormat.map(char => char.toInt).toArray
-      row.update(3, new GenericArrayData(absMT.timeFormat.map(char => char.toInt).toArray))
-      row
-    case rlMT: RelativeMeta =>
-      val arr = rlMT.timeFormat.map(char => char)
-      val row = new GenericMutableRow(3 + arr.length)
-      row.setByte(0, 1)
-      row.setLong(1, rlMT.value)
-      if (rlMT.rightBound.isDefined)
-        row.setLong(2, rlMT.rightBound.get)
-      else
-        row.setNullAt(2)
-      row.update(3, new GenericArrayData(rlMT.timeFormat.map(char => char.toInt).toArray))
-      row
-    case _ =>
-      throw new Exception("您输入类型不是TimeMeta在spark sql中没有预定义的序列化方法")
-  }
+  override def serialize(obj: Any): InternalRow = Utils.serializeForTimeMeta(obj)
 
-  override def deserialize(datum: Any): TimeMeta = {
-    datum match {
-      case row: InternalRow =>
-        val mtType = row.getByte(0)
-        val value = row.getLong(1)
-        val rightBound = if (row.isNullAt(2)) None else Some(row.getLong(2))
-        val timeFormat = row.getArray(3).toIntArray().map(_.toChar).mkString("")
-        if (mtType == 0) {
-          new AbsTimeMeta(value, rightBound, timeFormat)
-        } else {
-          new RelativeMeta(value, rightBound, timeFormat)
-        }
-    }
-  }
+  override def deserialize(datum: Any): TimeMeta = Utils.deserializeForTimeMeta(datum)
 
   override def pyUDT: String = "pyspark.mllib.linalg.BinningUDT"
 
