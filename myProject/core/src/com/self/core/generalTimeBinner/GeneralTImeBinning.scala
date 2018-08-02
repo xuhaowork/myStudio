@@ -268,99 +268,50 @@ object GeneralTImeBinning extends myAPP {
     testUDT()
 
 
-    //    val testData1 = Array(
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (null, 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2),
-    //      (new RelativeMeta(100000L, Some(1000000L), "HH:mm:ss"), 1, 2))
-    //
-    //
-    //    val testData2 = Array(
-    //      (new DenseVector(Array(1.0)), 1, 2),
-    //      (new DenseVector(Array(2.0)), 1, 2),
-    //      (new DenseVector(Array(3.0)), 1, 2))
-    //
-    //
-    //    val rdd = sc.parallelize(testData1).map(Row.fromTuple)
-    //    val rdd2 = sc.parallelize(testData2).map(Row.fromTuple)
-    //
-    //
-    //    /** 先通过rdd看看到底核心的数据流转需要什么类型工程结构，形成较为清晰的需求 */
-    //    val rawDataFrame = sqlc.createDataFrame(rdd, StructType(Array(
-    //      StructField("time", new TimeMetaUDT),
-    //      StructField("col1", IntegerType),
-    //      StructField("col2", IntegerType))))
-    //
-    //    rawDataFrame.show()
-    //
-    //
-    //    val rawDataFrame2 = sqlc.createDataFrame(rdd2, StructType(Array(
-    //      StructField("time", new VectorUDT),
-    //      StructField("col1", IntegerType),
-    //      StructField("col2", IntegerType))))
-    //
-    //
-    //    val ud2 = NullableFunctions.udf((mt: DenseVector) => new DenseVector(Array(0.0)))
-    //
-    //    import org.apache.spark.sql.functions.col
-    //
-    //    rawDataFrame2.select(ud2(col("time"))).show()
-    //
-    //
-    //    val ud3 = NullableFunctions.udf((mt: TimeMeta) => mt.createNew(0, Some(10 * 60 * 60 * 1000)))
-    //    //    val ud = UserDefinedFunction((mt: TimeMeta) => mt.createNew(0, Some(10 * 60 * 60 * 1000)),
-    //    //      new TimeMetaUDT, new TimeMetaUDT :: Nil)
-    //
-    //    rawDataFrame.select(ud3(col("time")).as("uuu")).show()
-    //
-    //
+    //    /** 通过单条数据测试 */
+    //        testSingle() // 测试一下
+
+    /** 通过单条数据测试分箱时间是否能够以Array形式展示 */
+    testUDT()
+
+    /** 1)解析器 */
+    /** 需要时间列名、列类型、时间信息 --窄口进 */
+    val timeColName = "time"
+    val timeColType: DataType = StringType // 这里要精准匹配
+
+    timeColType match {
+      case StringType =>
+        val timeFormat = "yyyy/MM/dd HH:mm:ss"
+        val timeColInfo = new StringTypeTimeColInfo(timeColName, timeFormat)
+        val timeParser = new TimeParser(timeColInfo)
+
+      case LongType =>
+
+
+      case TimestampType =>
+
+
+    }
 
 
 
-
-
-
-    //    /** 1)解析器 */
-    //    /** 需要时间列名、列类型、时间信息 --窄口进 */
-    //    val timeColName = "time"
-    //    val timeColType = StringType // 这里要精准匹配
-    //    val timeFormat = "yyyy/MM/dd HH:mm:ss"
-    //    val timeColInfo = new StringTypeTimeColInfo(timeColName, timeFormat)
-    //    val timeParser = new TimeParser(timeColInfo)
-    //
-    //    /** 2)相位设置 */
-    //    // 按时长分箱
-    //    // 分箱时长 单位为毫秒
-    //    val phaseType = "relative" // "absolute"
-    //    val phase = phaseType match {
-    //      case "absolute" =>
-    //        val timeString = "2018/01/1 0:0:0"
-    //        new DateTime(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(timeString).getTime)
-    //      case "relative" =>
-    //        val timeString = "00:00:00" // 需要用SimpleDateFormat解析
-    //      val format = "HH:mm:ss"
-    //        val sdf = new java.text.SimpleDateFormat(format)
-    //        sdf.setTimeZone(TimeZone.getTimeZone("UTC"))
-    //        new DateTime(sdf.parse(timeString).getTime).withZone(DateTimeZone.UTC)
-    //    }
-    //    val window = 2
-    //    val binningInfo = new TimeBinnerInfo(phase, window.toLong, "hour", true)
+    /** 2)相位设置 */
+    // 按时长分箱
+    // 分箱时长 单位为毫秒
+    val phaseType = "relative" // "absolute"
+    val phase = phaseType match {
+      case "absolute" =>
+        val timeString = "2018/01/1 0:0:0"
+        new DateTime(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(timeString).getTime)
+      case "relative" =>
+        val timeString = "00:00:00" // 需要用SimpleDateFormat解析
+      val format = "HH:mm:ss"
+        val sdf = new java.text.SimpleDateFormat(format)
+        sdf.setTimeZone(TimeZone.getTimeZone("UTC"))
+        new DateTime(sdf.parse(timeString).getTime).withZone(DateTimeZone.UTC)
+    }
+    val window = 2
+    val binningInfo = new TimeBinnerInfo(phase, window.toLong, "hour", true)
 
 
   }
