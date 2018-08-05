@@ -1,11 +1,13 @@
 package com.self.core.generalTimeBinner.models
 
-import com.self.core.generalTimeBinner.tools.Utils
+import com.zzjz.deepinsight.core.generalTimeBinner.tools.Utils
+import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.InternalRow
-import org.apache.spark.sql.catalyst.expressions.{BaseGenericInternalRow, GenericInternalRow, GenericMutableRow}
-import org.apache.spark.sql.catalyst.util.GenericArrayData
+import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
 import org.apache.spark.sql.types._
 import org.joda.time._
+
+import scala.collection.mutable
 
 /**
   * 分箱时间
@@ -262,7 +264,7 @@ class BinningTime(
     * @param performType interval或left或right
     * @return
     */
-  def getBinningResult(format: Option[String], performType: String): String = {
+  def getBinningResultToString(format: Option[String], performType: String): String = {
     val tipNode = getTipNode(true) // 获取末端结点
     val meta = tipNode.element
     val leftBound = new DateTime(meta.value).toString(format.getOrElse(meta.timeFormat))
@@ -282,30 +284,41 @@ class BinningTime(
     }
   }
 
-  def getBinningResidue(performType: String): String = {
-    val tipNode = getTipNode(false) // 获取末端结点
+
+  /**
+    * 获取分箱结果，并分箱结果展示为对应模式的字符串
+    *
+    * @param side left或right
+    * @return
+    */
+  def getBinningBySide(side: String): DateTime = {
+    val tipNode = getTipNode(true) // 获取末端结点
     val meta = tipNode.element
-    val leftBound = new DateTime(meta.value).toString(meta.timeFormat)
-    performType match {
+    side match {
       case "left" =>
-        leftBound
-      case "interval" =>
-        if (meta.rightBound.isDefined)
-          leftBound + "," + new DateTime(meta.rightBound.get).toString(meta.timeFormat)
-        else
-          leftBound
+        new DateTime(meta.value)
       case "right" =>
         if (meta.rightBound.isDefined)
-          new DateTime(meta.rightBound.get).toString(meta.timeFormat)
+          new DateTime(meta.rightBound.get)
         else
-          throw new Exception("没有右边界信息")
+          throw new SparkException("未能获得分箱后的右边界信息，请您查看是否已经分箱。")
     }
-
   }
 
 }
 
 
+
+/**
+  * [[BinningTime]]的关于SQL [[UserDefinedType]]类型
+  * ----
+  *
+  * @since 1.5.0 要求spark.sql中的[[GenericArrayData]]源码与1.5.0一致
+  * @define serialize   实现了自定义的序列化
+  * @define deserialize 实现了自定义的反序列化
+  * @define hashCode    实现了输出常数的hash
+  * @define equal       任意两个[[BinningTimeUDT]]比较都是相等
+  */
 class BinningTimeUDT extends UserDefinedType[BinningTime] {
   override def sqlType: DataType = ArrayType(
     StructType(Seq(
@@ -344,21 +357,24 @@ class BinningTimeUDT extends UserDefinedType[BinningTime] {
   override def deserialize(datum: Any): BinningTime = {
     datum match {
       case arr: GenericArrayData =>
-        val values = arr.array
-          .map(_.asInstanceOf[BaseGenericInternalRow])
-        val arrV = values.map {
-          row =>
-            val internalRow = row.getStruct(0, 4)
-            val element = Utils.deserializeForTimeMeta(internalRow)
-//            deep, position, parentPosition
-            val deep = row.getInt(1)
-            val position = row.getInt(2)
-            val parentPosition = row.getInt(3)
-            (element, deep, position, parentPosition)
+        val arrV = mutable.ArrayBuilder.make[(TimeMeta, Int, Int, Int)]()
+        val size = arr.numElements()
+        var i = 0
+        while (i < size) {
+          val row = arr.getStruct(i, 4)
+          val internalRow = row.getStruct(0, 4)
+          val element = Utils.deserializeForTimeMeta(internalRow)
+          //            deep, position, parentPosition
+          val deep = row.getInt(1)
+          val position = row.getInt(2)
+          val parentPosition = row.getInt(3)
+          arrV += Tuple4(element, deep, position, parentPosition)
+          i += 1
         }
-        Utils.reConstruct(arrV)
+        Utils.reConstruct(arrV.result())
     }
   }
+
 
   override def pyUDT: String = "pyspark.mllib.linalg.BinningTimeUDT"
 
@@ -444,10 +460,19 @@ private[generalTimeBinner] class RelativeMeta(
       str += "," + new DateTime(rightBound.get).withZone(DateTimeZone.UTC).toString(timeFormat)
     "[" + str + "]"
   }
-
 }
 
 
+/**
+  * [[BinningTime]]的关于SQL [[UserDefinedType]]类型
+  * ----
+  *
+  * @since 1.5.0 要求spark.sql中的[[GenericArrayData]]源码与1.5.0一致
+  * @define serialize   实现了自定义的序列化
+  * @define deserialize 实现了自定义的反序列化
+  * @define hashCode    实现了输出常数的hash
+  * @define equal       任意两个[[BinningTimeUDT]]比较都是相等
+  */
 class TimeMetaUDT extends UserDefinedType[TimeMeta] {
   override def sqlType: DataType = StructType(Seq(
     StructField("type", ByteType, nullable = false),

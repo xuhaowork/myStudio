@@ -1,13 +1,12 @@
-package com.self.core.generalTimeBinner
+package com.self.core.generalTimeBinner.tests
 
 import java.sql.Timestamp
 import java.util.TimeZone
 
 import com.google.gson.{Gson, JsonParser}
 import com.zzjz.deepinsight.basic.BaseMain
-import com.zzjz.deepinsight.core.featurePretreatment.utils.Tools.{columnExists, columnTypesIn}
 import com.zzjz.deepinsight.core.generalTimeBinner.models._
-import com.zzjz.deepinsight.core.generalTimeBinner.tools.{BinningUDFUtil, Utils}
+import com.zzjz.deepinsight.core.generalTimeBinner.tools.Utils
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, NullableFunctions, Row, UserDefinedFunction}
@@ -268,41 +267,32 @@ object GeneralTImeBinning extends BaseMain {
     //        testSingle() // 测试一下
 
     /** 通过单条数据测试分箱时间是否能够以Array形式展示 */
-    //    testUDT()
+        testUDT()
+
 
     /** 0)获得一些系统变量还有初始数据 */
-    val jsonparam = "<#zzjzParam#>"
-    val gson = new Gson()
-    val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
-    val parser = new JsonParser()
-    val pJsonParser = parser.parse(jsonparam).getAsJsonObject
-    val z1 = z
-    val rddTableName = "<#zzjzRddName#>"
 
-    val tableName = try {
-      p.get("inputTableName").trim
-    } catch {
-      case e: Exception => throw new Exception(s"没有找到您输入的预测表参数，具体信息${e.getMessage}")
-    }
 
-    val rawDataFrame = try {
-      z1.rdd(tableName).asInstanceOf[org.apache.spark.sql.DataFrame]
-    } catch {
-      case e: Exception => throw new Exception(s"获取预测表${tableName}过程中失败，具体信息${e.getMessage}")
-    }
+    val rawDataFrame = rawDataFrame2
+
+
+//    val numFeatures = try {
+//      z1.rdd(p.get("numFeatures")).asInstanceOf[Option[Int]].get
+//    } catch {
+//      case e: Exception => throw new Exception(s"获得训练特征数信息时出现异常，具体信息${e.getMessage}")
+//    }
+//
+//
+//    val featureColsArr = pJsonParser.get("featureCols").getAsJsonArray
+
 
     val sQLContext = rawDataFrame.sqlContext
     val sparkContext = sQLContext.sparkContext
 
     /** 1)解析器 */
     /** 需要时间列名、列类型、时间信息 --窄口进 */
-    val timeColName = pJsonParser
-      .get("timeColName")
-      .getAsJsonArray
-      .get(0)
-      .getAsJsonObject
-      .get("name")
-      .getAsString
+    val timeColName = "time"
+    import com.zzjz.deepinsight.core.featurePretreatment.utils.Tools.{columnExists, columnTypesIn}
 
     columnExists(timeColName, rawDataFrame, true) // 确认列名存在
     columnTypesIn(timeColName, rawDataFrame, true,
@@ -310,90 +300,137 @@ object GeneralTImeBinning extends BaseMain {
 
     val timeColType: DataType = rawDataFrame.schema.apply(timeColName).dataType
 
-    val timeColInfoObj = pJsonParser
-      .get("timeColInfoObj").getAsJsonObject
-
-    val format = timeColInfoObj.get("value").getAsString
+    var binningForResult = true
     val timeColInfo = timeColType match {
       case StringType =>
-        require(format == "string", s"您输入的时间列类型为$format，而实际类型为string，" +
-          s"如果确定为${format}而只是类型不一致，您可以通过数据建模算子转换")
-        val timeFormatObj = timeColInfoObj.get("timeFormatObj").getAsJsonObject
-        val timeFormat = timeFormatObj.get("timeFormatType")
-          .getAsJsonObject.get("timeFormat").getAsString
+        val timeFormat = "yyyy/MM/dd HH:mm:ss"
         new StringTypeTimeColInfo(timeColName, timeFormat)
 
       case LongType =>
-        require(format == "long", s"您输入的时间列类型为$format，而实际类型为long，" +
-          s"请在时间字段类型选择长整型时间戳")
-        val unit = timeColInfoObj.get("unit").getAsString
+        val unit = "second"
         new LongTypeTimeColInfo(timeColName, unit)
 
       case TimestampType =>
-        require(format == "timestamp", s"您输入的时间列类型为$format，而实际类型为timestamp，" +
-          s"请在时间字段类型选择时间戳类型")
         new TimestampTypeTimeColInfo(timeColName)
 
       case _: BinningTimeUDT =>
-        require(format == "binningTime", s"您输入的时间列类型为$format，而实际类型为binningTime，" +
-          s"请在时间字段类型选择分箱时间类型")
-        val forLeft = timeColInfoObj.get("forLeft").getAsString == "true"
-        new BinningTypeTimeColInfo(timeColName, forLeft)
+        binningForResult  = "" == "true"
+        new BinningTypeTimeColInfo(timeColName, true)
     }
     val timeParser = new TimeParser(timeColInfo)
 
     /** 2)相位设置并结合分箱信息构造分箱信息 */
     // 按时长分箱
     /** 需要相位的绝对相对信息、相位的时长信息 */
-
-    val phaseObj = pJsonParser.get("phase").getAsJsonObject
-    val phaseType = phaseObj.get("value").getAsString //"relative" // "absolute"
+    val phaseType = "relative" // "absolute"
     val phase = phaseType match {
       case "absolute" =>
-        val timeString = phaseObj.get("timeString").getAsString
+        val timeString = "2018-01-01 0:0:0"
         new DateTime(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").parse(timeString).getTime)
       case "relative" =>
 
         /** 相对时间需要输入时间字符串和选择时间字符串的格式 */
-        val timeString = phaseObj.get("timeString").getAsString
-        val format = phaseObj.get("format").getAsString
+        val timeString = "00:00:00" // 需要用SimpleDateFormat解析
+      val format = "HH:mm:ss"
         val sdf = new java.text.SimpleDateFormat(format)
         sdf.setTimeZone(TimeZone.getTimeZone("UTC")) // 相对信息需要设置为UTC时间
         new DateTime(sdf.parse(timeString).getTime).withZone(DateTimeZone.UTC)
     }
-    val window = try {
-      pJsonParser.get("window").getAsString.toLong
-    } catch {
-      case e: Exception => throw new Exception(s"获取分箱窗宽信息时出现错误，具体信息${e.getMessage}")
-    }
-
-
-    val unit = pJsonParser.get("unit").getAsString
-
-    val binningInfoValue = timeColInfo match {
-      case info: BinningTypeTimeColInfo =>
-        new TimeBinnerInfo(phase, window.toLong, unit, info.forLeft)
-
-      case _: TimeColInfo =>
-        new TimeBinnerInfo(phase, window.toLong, unit, true)
-    }
-
-    val binningInfo = sparkContext.broadcast(binningInfoValue).value
+    val window = 2
+    val unit = "hour"
+    val binningInfo = sparkContext.broadcast(new TimeBinnerInfo(phase, window.toLong, unit, true)).value
 
     /** 3)获得分箱展示信息，并构造分箱的UDF */
-    val outputCol = pJsonParser.get("outputCol").getAsString
+    val outputCol = "output"
+    val performanceType = "onlyBinningResult" // "binningTime", "onlyBinningResult"
 
-    val performanceTypeObj = pJsonParser.get("performanceTypeObj").getAsJsonObject
-    val performanceInfo = try{
-      BinningUDFUtil.readFromJson(performanceTypeObj)
-    }catch {
-      case e: Exception => throw new Exception(s"将展示模式解析为能够序列化的类型时失败, ${e.getMessage}")
-    } // 将JsonObject存到能够序列化的类中
+    val binningUDF: UserDefinedFunction = performanceType match {
+      case "binningTime" =>
+        NullableFunctions.udf(
+          (any: Any) => {
+            /** 解析为BinningTime */
+            val parserTime: BinningTime = timeParser.parse(any)
+            parserTime.binning(binningInfo)
+          })
 
-    val binningUDF = BinningUDFUtil.constructUDF(timeParser, binningInfo, performanceInfo)
+      case "onlyBinningResult" =>
+        // "interval", "left", "right"
+        val byInterval = "left"
+        // "string" // "long" // "timestamp"
+        val resultType = "timestamp"
+        resultType match {
+          // string是udf始终是BinningTime => string
+          case "string" =>
+            // "byHand" // "select" // "selfAdapt"
+            val timeFormatType = "byHand"
+            val timeFormat = timeFormatType match {
+              case "byHand" =>
+                val handScript = "yyyy-MM-ddEEE HH:mm:ss"
+                Some(handScript)
+              case "select" =>
+                val select = "yyyy-MM-dd HH:mm:ss"
+                Some(select)
+              case "selfAdapt" =>
+                None
+            }
 
-    val newDataFrame = rawDataFrame.withColumn(outputCol, binningUDF(col(timeColName)))
+            NullableFunctions.udf(
+              (any: Any) => {
+                /** 解析为BinningTime */
+                val parserTime: BinningTime = timeParser.parse(any)
+                parserTime.binning(binningInfo)
+                parserTime.getBinningResultToString(timeFormat, byInterval)
+              })
 
+
+          case "long" => // long以区间展示是string类型，其他为long类型
+            val unit = "second"
+            if (byInterval == "interval") {
+              NullableFunctions.udf(
+                (any: Any) => {
+                  /** 解析为BinningTime */
+                  val parserTime: BinningTime = timeParser.parse(any)
+                  parserTime.binning(binningInfo)
+                  val left =
+                    if (unit == "second")
+                      parserTime.getBinningBySide("left").getMillis / 1000
+                    else
+                      parserTime.getBinningBySide("left").getMillis
+                  val right =
+                    if (unit == "second")
+                      parserTime.getBinningBySide("left").getMillis / 1000
+                    else
+                      parserTime.getBinningBySide("left").getMillis
+                  "[" + left + ", " + right + "]"
+                })
+            } else {
+              NullableFunctions.udf(
+                (any: Any) => {
+                  /** 解析为BinningTime */
+                  val parserTime: BinningTime = timeParser.parse(any)
+                  parserTime.binning(binningInfo)
+
+                  if (unit == "second")
+                    parserTime.getBinningBySide(byInterval).getMillis / 1000
+                  else
+                    parserTime.getBinningBySide(byInterval).getMillis
+                })
+            }
+
+          case "timestamp" =>
+            NullableFunctions.udf(
+              (any: Any) => {
+                /** 解析为BinningTime */
+                val parserTime: BinningTime = timeParser.parse(any)
+                parserTime.binning(binningInfo)
+                val millis = parserTime.getBinningBySide(byInterval).getMillis
+                new Timestamp(millis)
+              })
+        }
+
+    }
+
+    rawDataFrame.withColumn(outputCol, binningUDF(col(timeColName))).show()
 
   }
 }
