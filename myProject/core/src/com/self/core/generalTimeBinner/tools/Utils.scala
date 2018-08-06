@@ -3,11 +3,11 @@ package com.self.core.generalTimeBinner.tools
 import java.sql.Timestamp
 
 import com.google.gson.JsonObject
-import com.zzjz.deepinsight.core.generalTimeBinner.models._
+import com.self.core.generalTimeBinner.models._
 import org.apache.spark.sql.{NullableFunctions, UserDefinedFunction}
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
-import org.apache.spark.sql.types.GenericArrayData
+import org.apache.spark.sql.catalyst.util.GenericArrayData
 
 object Utils extends Serializable {
   val unitMatch: Map[String, Long] = Map(
@@ -144,7 +144,7 @@ object Utils extends Serializable {
 /**
   * 构造分箱UDF的工具类 --该类不必序列化
   * ----
-  * @define readFromJson 提供一个从JsonObject到[[PerformanceInfo]]的转换，转为能序列化的类型，方便在UDF中调用
+  * @define readFromJson 提供一个从JsonObject到[[com.self.core.generalTimeBinner.models.PerformanceInfo]]的转换，转为能序列化的类型，方便在UDF中调用
   * @define constructUDF 提供一个构建UDF的函数 需要解析器，分箱信息，展示信息三种信息
   *
   */

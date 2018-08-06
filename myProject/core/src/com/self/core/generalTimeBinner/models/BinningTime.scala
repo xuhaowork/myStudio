@@ -1,9 +1,10 @@
 package com.self.core.generalTimeBinner.models
 
-import com.zzjz.deepinsight.core.generalTimeBinner.tools.Utils
+import com.self.core.generalTimeBinner.tools.Utils
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.GenericMutableRow
+import org.apache.spark.sql.catalyst.util.GenericArrayData
 import org.apache.spark.sql.types._
 import org.joda.time._
 
