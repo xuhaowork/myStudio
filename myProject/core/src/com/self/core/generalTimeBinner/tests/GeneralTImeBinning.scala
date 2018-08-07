@@ -630,6 +630,7 @@ object GeneralTImeBinning extends myAPP {
     }
     println("string1", string1)
     println("string2", string2)
+    sqlc
 
 
 

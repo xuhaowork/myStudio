@@ -1,4 +1,4 @@
-package src.com.self.core.geoHash
+package com.self.core.geoHash
 
 import scala.collection.mutable.ArrayBuffer
 

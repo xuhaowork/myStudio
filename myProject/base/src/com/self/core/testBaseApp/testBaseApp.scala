@@ -22,9 +22,36 @@ object testBaseApp extends myAPP{
 
 
 
+    import com.zzjz.deepinsight.core.SomeOne
+
+    import java.io.PrintWriter
+    import scala.reflect.io.Directory
 
 
-//    // Test SparkContext.
+    import java.io.File
+
+    val path = new File("./")
+    path.listFiles().foreach(file => println(file.getAbsolutePath))
+
+    import com.zzjz.deepinsight.core.SomeOne
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    //    // Test SparkContext.
 //    val rdd = sc.parallelize((1 to 100).toList)
 //    val rdd_sum = rdd.reduce(_ + _)
 //    println(rdd_sum)
