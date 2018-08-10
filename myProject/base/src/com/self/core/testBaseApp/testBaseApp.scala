@@ -22,7 +22,6 @@ object testBaseApp extends myAPP{
 
 
 
-    import com.zzjz.deepinsight.core.SomeOne
 
     import java.io.PrintWriter
     import scala.reflect.io.Directory
@@ -33,7 +32,6 @@ object testBaseApp extends myAPP{
     val path = new File("./")
     path.listFiles().foreach(file => println(file.getAbsolutePath))
 
-    import com.zzjz.deepinsight.core.SomeOne
 
 
 
