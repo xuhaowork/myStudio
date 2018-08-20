@@ -1,7 +1,9 @@
 package com.self.core.testBaseApp
 
 import com.self.core.baseApp.myAPP
-import src.com.self.core.geoHash.{GeoHash, GeoHashMap}
+import com.self.core.geoHash.GeoHash
+import src.com.self.core.geoHash.GeoHashMap
+//import src.com.self.core.geoHash.{GeoHash, GeoHashMap}
 
 import scala.collection.mutable.ArrayBuffer
 

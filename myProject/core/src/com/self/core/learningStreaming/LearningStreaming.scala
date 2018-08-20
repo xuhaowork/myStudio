@@ -18,5 +18,8 @@ object LearningStreaming extends myAPP{
     smc.awaitTermination()
 
 
+    smc.socketTextStream("192.168.21.11", 9999)
+
+
   }
 }
