@@ -3,6 +3,8 @@ package com.self.core.learningStreaming
 import com.self.core.baseApp.myAPP
 import org.apache.spark.streaming.dstream.DStream
 
+import scala.reflect.ClassTag
+
 object writeInfoToDB {
   def main(args: Array[String]): Unit = {
     println("good")
@@ -15,8 +17,9 @@ object writeInfoToDB {
     import org.apache.spark.storage.StorageLevel
     val conf = new SparkConf().setAppName("NetworkWordCount").setMaster("local[2]")
     val sc = new SparkContext(conf)
-    val ssc = new StreamingContext(sc, Seconds(20))
+    val ssc = new StreamingContext(sc, Seconds(10))
 
+    ssc.checkpoint("F://")
     // 通过Socket获取数据，该处需要提供Socket的主机名和端口号，数据保存在内存和硬盘中
 
     val lines = ssc.socketTextStream("192.168.21.14", 9999, StorageLevel.MEMORY_AND_DISK_SER)
@@ -24,13 +27,26 @@ object writeInfoToDB {
     // 对读入的数据进行分割、计数
     val words = lines.flatMap(_.split(","))
 
-    val wordCounts = words.map(x => (x, 1)).reduceByKey(_ + _)
 
-    wordCounts.print()
+    val wordCounts = words.map(x => (x, 1))
+    val result = wordCounts.updateStateByKey((values: Seq[Int], state: Option[Int]) => {
+      var newValues = state.getOrElse(0)
+      values.foreach {
+        value =>
+          newValues += value
+      }
+      Some(newValues)
+    })
+
+    result.print()
 
     ssc.start()
-
     ssc.awaitTermination()
+
+
+    "Array[Int]"
+
+    Manifest
 
 
     /** 最后效果 */
