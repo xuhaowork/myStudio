@@ -10,7 +10,7 @@ import org.apache.spark.{SparkConf, SparkContext}
   * Created by DataShoe on 2018/1/5.
   */
 abstract class myAPP {
-  lazy val conf = new SparkConf().setMaster("local").setAppName("DataShoe-Learning")
+  lazy val conf = new SparkConf().setMaster("local[4]").setAppName("DataShoe-Learning")
   lazy val sc = new SparkContext(conf)
   lazy val sqlc = new SQLContext(sc)
   lazy val hqlc = sqlc
