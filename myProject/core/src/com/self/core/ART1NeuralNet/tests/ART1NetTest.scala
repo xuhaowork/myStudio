@@ -22,8 +22,18 @@ object ART1NetTest extends myAPP {
   override def run(): Unit = {
     println("this is a main file")
 
-    val rho: Double = 0.99 // 0.1
+    val rho: Double = 0.9 // 0.1
     val numFeatures = 25
+
+    val model2 = ARTModel.init(rho, numFeatures)
+
+    trainData.foreach {
+      vec =>
+        model2.learn(vec)
+    }
+
+    model2.knowledge.foreach(println)
+
 
     var model = ARTModel.init(rho, numFeatures, 200)
 
@@ -32,35 +42,30 @@ object ART1NetTest extends myAPP {
       throw new Exception("ART1神经网络是一种online learning式的学习算法, 它实质上不是以分布式的方式运行的而是逐个分区运行的, 您的分区数超过100个, 可能会严重拖慢速度")
     }
 
-
-    val numForeachPartition = rdd.mapPartitionsWithIndex { case (index, iter: Iterator[DenseVector[Double]]) => Iterator((index, iter.size.toLong)) }.filter(_._2 > 0).collect()
+    val numForeachPartition = rdd.mapPartitionsWithIndex {
+        case (index, iter: Iterator[DenseVector[Double]]) => Iterator((index, iter.size.toLong))
+      }.filter(_._2 > 0)
+      .collect()
 
     model.knowledge.foreach(println)
-
-
-
-//    println("-" * 80)
-//
-//    numForeachPartition.foreach {
-//      case (partitionId, _) =>
-//        val res = rdd.sparkContext.runJob(
-//          rdd,
-//          (iter: Iterator[DenseVector[Double]]) => {
-//            iter.foreach {
-//              vec =>
-//                println(s"在分区${partitionId}前, 知识为${model.knowledge.mkString(",")}")
-//                println(s"分区中的数据为：${vec.data.mkString(",")}")
-//                model.learn(vec)
-//            }
-//            model
-//          },
-//          Seq(partitionId)
-//        )
-//        model = res.head
-//        println(s"经过分区${partitionId}后, 知识为${model.knowledge.mkString(",")}")
-//    }
-//
-//    var s = 1
+    numForeachPartition.foreach {
+      case (partitionId, _) =>
+        val res = rdd.sparkContext.runJob(
+          rdd,
+          (iter: Iterator[DenseVector[Double]]) => {
+            iter.foreach {
+              vec =>
+                println(s"在分区${partitionId}前, 知识为${model.knowledge.mkString(",")}")
+                println(s"分区中的数据为：${vec.data.mkString(",")}")
+                model.learn(vec)
+            }
+            model
+          },
+          Seq(partitionId)
+        )
+        model = res.head
+        println(s"经过分区${partitionId}后, 知识为${model.knowledge.mkString(",")}")
+    }
 
 
 //    numForeachPartition.foreach {
@@ -89,80 +94,7 @@ object ART1NetTest extends myAPP {
 //
 //    println("-" * 80)
 
-    var model2 = ARTModel.init(rho, numFeatures)
 
-    trainData.foreach {
-      vec =>
-        model2.learn(vec)
-    }
-
-
-    model.knowledge.foreach(println)
-
-
-
-    //    val initialRecNeurons = 1
-    //    val initialWMatrix: DenseMatrix[Double] = DenseMatrix.ones[Double](initialRecNeurons, numFeatures) :* (1.0 / (1 + numFeatures))
-    //    val initialTMatrix: DenseMatrix[Double] = DenseMatrix.ones[Double](numFeatures, initialRecNeurons)
-    //
-    //    def train(vec: DenseVector[Double], initialWMatrix: DenseMatrix[Double], initialTMatrix: DenseMatrix[Double])
-    //    : (Int, DenseMatrix[Double], DenseMatrix[Double]) = {
-    //      var wMatrix = initialWMatrix
-    //      var tMatrix = initialTMatrix
-    //
-    //      val recVec: DenseVector[Double] = wMatrix * vec // 此时是识别层
-    //      val valueWithIndex: Array[(Double, Int)] = recVec.data.zipWithIndex
-    //      val sum = vec.data.sum
-    //
-    //      var neurons = valueWithIndex
-    //      var flag = false // 标识没有找到合适的
-    //
-    //      var maxIndex = -1
-    //      var maxTij = DenseVector.zeros[Double](1)
-    //      var similarity = Double.NaN
-    //
-    ////      println("-" * 80)
-    ////      println("neurons:", neurons.mkString(", "))
-    //      while (!neurons.isEmpty && !flag) {
-    //        maxIndex = neurons.maxBy(_._1)._2
-    //
-    ////        println(s"识别层最大的神经元id为$maxIndex")
-    //
-    //        maxTij = tMatrix(::, maxIndex).toDenseVector
-    //
-    //        similarity = maxTij dot vec
-    //
-    ////        println(s"相似度为${similarity / sum}")
-    //        if (similarity / sum >= rho) {
-    //          flag = true
-    //        } else {
-    //          val drop = neurons.map(_._1).zipWithIndex.maxBy(_._1)._2
-    //          neurons = neurons.slice(0, drop) ++ neurons.slice(drop + 1, neurons.length)
-    //        }
-    //      }
-    //
-    //
-    //      if (flag) { // 标识找到合适的, 更新合适的权值
-    ////        println("找到合适的")
-    //        val vl = maxTij :* vec
-    //        tMatrix(::, maxIndex) := vl
-    //        wMatrix(maxIndex, ::).inner := vl :* (1 / (1 - 1.0 / numFeatures + similarity))
-    //      } else { // 标识没找到合适的, 新建一个合适的
-    ////        println("没有找到合适的，造一个")
-    //        maxIndex = wMatrix.rows
-    //        tMatrix = DenseMatrix.horzcat(tMatrix, DenseMatrix.ones[Double](numFeatures, 1))
-    //        wMatrix = DenseMatrix.vertcat(wMatrix, DenseMatrix.ones[Double](1, numFeatures) :* (1.0 / (1 + numFeatures)))
-    //      }
-    //
-    ////      println("迭代后的t矩阵为：")
-    ////      println(tMatrix)
-    ////      println("迭代后的w矩阵为：")
-    ////      println(wMatrix)
-    //      (maxIndex, wMatrix, tMatrix)
-    //    }
-    //
-    //    var wMatrix = initialWMatrix
-    //    var tMatrix = initialTMatrix
 
 
   }
