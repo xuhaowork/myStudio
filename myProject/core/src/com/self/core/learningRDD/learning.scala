@@ -68,6 +68,8 @@ object learning extends myAPP{
         "O","P","Q","R","S","T",
         "U","V","W","X","Y","Z"
       ), 4)
+
+
       val res1 = rdd.mapPartitionsWithIndex{(index, iter) => Array((index, iter.toArray)).toIterator}.reduceByKey(_ ++ _)
         res1.collectAsMap().foreach(iter => println(iter._1, iter._2.mkString(",")))
 
