@@ -44,7 +44,7 @@ object learning extends myAPP{
     val rd = new java.util.Random(123L)
     val dt = Seq.fill(testNum)(rd.nextGaussian())
 
-    val rawRdd = sc.parallelize(dt, partitions)
+    val rawRdd: RDD[Double] = sc.parallelize(dt, partitions)
     rawRdd.cache()
     rawRdd.count()
 //    rawRdd.foreachPartition(arr =>

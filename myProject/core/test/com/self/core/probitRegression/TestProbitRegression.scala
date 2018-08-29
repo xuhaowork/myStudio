@@ -104,8 +104,7 @@ object TestProbitRegression extends myAPP {
             case "float" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Float](name).toDouble
             case "long" => if (row.isNullAt(getIndex(name))) Double.NaN else row.getAs[Long](name).toDouble
             case "boolean" => if (row.isNullAt(getIndex(name))) Double.NaN else if (row.getAs[Boolean](name)) 1.0 else 0.0
-            case _ => throw new Exception(
-              "目前支持string","int、double、float、long以及boolean类型的特征字段")
+//            case _ => throw new Exception("目前支持string","int、double、float、long以及boolean类型的特征字段")
           }
       }.toArray
 
