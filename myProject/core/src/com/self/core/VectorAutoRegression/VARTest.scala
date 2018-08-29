@@ -110,7 +110,7 @@ object VARTest extends myAPP {
     // 规约方式
     val reduction = "first" // "min", "mean", "first"
     import org.apache.spark.sql.functions.{first, max, mean, min}
-    val DFAfterReduction = reduction match {
+    val DFAfterReduction: DataFrame = reduction match {
       case "max" =>
         DFAfterBinning.groupBy(col(binningIdColName))
           .agg(max(col(variablesColNames.head)).cast(DoubleType).alias(variablesColNames.head),
@@ -137,28 +137,38 @@ object VARTest extends myAPP {
     println("第二步按窗口规约后结果为：")
     DFAfterReduction.show()
 
-
     /** 3)窗口补全和记录补全 */
     // 补全方式 "mean", "zero", "linear"
-
-
-    def windowComplement(startWindowId: Long, endWindowId: Long) = {
+    def windowComplement(DFAfterReduction: DataFrame, startWindowId: Long, endWindowId: Long, format: String) = {
       /** 1)根据窗口id生成PairRDD并相机补全最大最小值 */
       var rdd: RDD[(Long, Row)] = DFAfterReduction.rdd.map {
         row =>
           (row.getAs[Long](binningIdColName), Row.fromSeq(row.toSeq.drop(1)))
       }
 
-      val (minWindowId, minWindowValue) = rdd.min()(Ordering.by[(Long, Row), Long](_._1))
-      val (maxWindowId, maxWindowValue) = rdd.max()(Ordering.by[(Long, Row), Long](_._1))
+      val ((minWindowId, minWindowValue), (maxWindowId, maxWindowValue)) =
+        format match {
+          case "mean" =>
+            val row = DFAfterReduction.select(variablesColNames.map(name => mean(col(name))):_*).head()
+            ((rdd.keys.min(), row),
+              (rdd.keys.max(), row))
+          case "zero" =>
+            val row = Row.fromSeq(variablesColNames.map(_ => 0.0))
+            ((rdd.keys.min(), row),
+              (rdd.keys.max(), row))
+          case "linear" =>
+            (rdd.min()(Ordering.by[(Long, Row), Long](_._1)),
+              rdd.max()(Ordering.by[(Long, Row), Long](_._1)))
+        }
+
       if (minWindowId != startWindowId) {
         println("minWindowId", minWindowId, startWindowId)
         rdd = rdd.union(sparkContext.parallelize(Seq((startWindowId, minWindowValue))))
-      } // 如果开头缺失则找它最近时间的值补全（线性插值时这样）
+      } // 如果开头缺失则找它最近时间的值补全
 
       if (maxWindowId != endWindowId) {
         rdd = rdd.union(sparkContext.parallelize(Seq((endWindowId, maxWindowValue))))
-      } // 如果结尾缺失则找它最近时间的值补全（线性插值时这样）
+      } // 如果结尾缺失则找它最近时间的值补全
 
       /** 2)获得非空分区的数目 */
       val numParts = 4
@@ -228,88 +238,64 @@ object VARTest extends myAPP {
           iter.map(v => (index, v))
       }.collect().sortBy(_._1).foreach(println)
 
+      /** 按起止id补全 */
+      val resultRdd = rePartitionRdd.mapPartitions(
+        iter => {
+          val result = mutable.ArrayBuilder.make[(Long, (Long, Row))]()
 
+          var lastWindowId = 0L
+          var plus = 0L // 循环计数器
+          var lastRow: Row = null
+          var i = 0
+          var lastKey = 0L
+          while (iter.hasNext) {
+            val (key, (windowId, row)) = iter.next()
 
-      //      /** 按起止id补全 */
-      //      val resultRdd = rePartitionRdd.mapPartitions(
-      //        iter => {
-      //          val result = mutable.ArrayBuilder.make[(Long, (Long, Row))]()
-      //
-      //          var lastWindowId = 0L
-      //          var plus = 0L // 循环计数器
-      //          var lastRow: Row = null
-      //          var i = 0
-      //          var lastKey = 0L
-      //          while (iter.hasNext){
-      //            val (key, (windowId, row)) = iter.next()
-      //
-      //            if(i == 0) {
-      //              result += Tuple2(key + plus, (windowId, row))
-      //              lastWindowId = windowId
-      //              lastKey = key
-      //              lastRow = row
-      //              plus += 1
-      //            } else {
-      //              for (each <- 1L to (windowId - lastWindowId)) {
-      //                result += Tuple2(lastKey + plus, (lastWindowId + each, fillValue(lastRow, row)))
-      //                //          lastKey += 1
-      //                plus += 1
-      //              }
-      //
-      //              lastWindowId = windowId
-      //              lastRow = row
-      //            }
-      //
-      //            i += 1
-      //          }
-      //
-      //          result.result().dropRight(1).toIterator
-      //        }
-      //      )
-      //
-      //      resultRdd
+            if (i == 0) {
+              result += Tuple2(key + plus, (windowId, row))
+              lastWindowId = windowId
+              lastKey = key
+              lastRow = row
+              plus += 1
+            } else {
+              for (each <- 1L to (windowId - lastWindowId)) {
+                val fillValue = if(format == "linear") fillLinear(lastRow, row) else minWindowValue
+                result += Tuple2(lastKey + plus,
+                  (lastWindowId + each, if(each == 1L) row else fillValue))
+                //          lastKey += 1
+                plus += 1
+              }
+
+              lastWindowId = windowId
+              lastRow = row
+            }
+
+            i += 1
+          }
+
+          result.result().dropRight(1).toIterator
+        }
+      )
+
+      resultRdd
     }
 
-    windowComplement(0, 14)
+    windowComplement(DFAfterReduction, 0, 14, "mean")
 
+    def fillLinear(starRow: Row, endRow: Row): Row = {
+      Row.fromSeq(starRow.toSeq.zip(endRow.toSeq).map { case (v1, v2) => v1.asInstanceOf[Double] + v2.asInstanceOf[Double] })
+    }
 
+    val u = windowComplement(DFAfterReduction, 0, 14, "mean")
 
+    u.mapPartitionsWithIndex {
+      case (index, iter) =>
+        iter.map(v => (index, v))
+    }.collect().sortBy(_._1).foreach(println)
 
-    //    def fillValue(starRow: Row, endRow: Row): Row = {
-    //      Row.fromSeq(starRow.toSeq.zip(endRow.toSeq).map { case (v1, v2) => v1.asInstanceOf[Double] + v2.asInstanceOf[Double]})
-    //    }
-    //
-    //    val u = windowComplement(0, 14)
-    //
-    //    u.mapPartitionsWithIndex{
-    //      case (index, iter) =>
-    //        iter.map(v => (index, v))
-    //    }.collect().sortBy(_._1).foreach(println)
-
-
-    //    (0,(8589934594,  (6,[200.0,48.0,-15.0])))
-    //    (0,(8589934595,  (7,[2.0,-100.0,-30.0])))
-    //    (0,(8589934592,  (4,[-200.0,100.0,50.0])))
-    //    (0,(8589934593,  (5,[-1.0,198.0,50.0])))
-    //
-    //    (1,(17179869187, (11,[20.0,-100.0,-30.0])))
-    //    (1,(17179869188, (12,[142.0,-200.0,-165.0])))
-    //    (1,(17179869188, (12,[142.0,-200.0,-165.0])))
-    //    (1,(17179869188, (12,[142.0,-200.0,-165.0])))
-    //    (1,(17179869189, (13,[142.0,-200.0,-165.0])))
-    //    (1,(17179869184, (8,[90.0,0.0,-1.0])))
-    //    (1,(17179869185, (9,[180.0,0.0,-2.0])))
-    //    (1,(17179869186, (10,[91.0,-50.0,-16.0])))
-    //
-    //    (3,(0,           (0,[123.0,-150.0,-150.0])))
-    //    (3,(1,           (1,[38.0,-200.0,-165.0])))
-    //    (3,(2,           (2,[218.0,-158.0,-300.0])))
-    //    (3,(3,           (3,[200.0,42.0,-300.0])))
-
-    // repartition是无序还是foreach println是无序
+    // repartition是无序还是foreach println是无序 --本地验证是有序的只是打印的时候由于线程的关系变成无序的了
 
   }
-
 
 
 }
