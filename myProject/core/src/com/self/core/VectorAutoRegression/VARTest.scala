@@ -2,12 +2,15 @@ package com.self.core.VectorAutoRegression
 
 import java.sql.Timestamp
 
+import scala.collection.mutable
 import com.self.core.VectorAutoRegression.utils.ToolsForTimeSeriesWarp
 import com.self.core.baseApp.myAPP
 import com.self.core.featurePretreatment.utils.Tools
+import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
-import org.apache.spark.sql.{DataFrame, NullableFunctions}
+import org.apache.spark.sql.{DataFrame, NullableFunctions, Row}
+import org.apache.spark.{Partitioner, SparkException}
 
 object VARTest extends myAPP {
   def createData(): DataFrame = {
@@ -139,107 +142,174 @@ object VARTest extends myAPP {
     // 补全方式 "mean", "zero", "linear"
 
 
-//    def windowComplement(startWindowId: Long, endWindowId: Long) = {
-//      /** 1)根据窗口id生成PairRDD并相机补全最大最小值 */
-//      var rdd: RDD[(Long, Row)] = DFAfterReduction.rdd.map {
-//        row =>
-//          (row.getAs[Long](binningIdColName), row)
-//      }
-//
-//      val (minWindowId, minWindowValue) = rdd.max()(Ordering.by[(Long, Row), Long](_._1))
-//      val (maxWindowId, maxWindowValue) = rdd.min()(Ordering.by[(Long, Row), Long](_._1))
-//      if (minWindowId != startWindowId) {
-//        rdd = rdd.union(sparkContext.parallelize(Seq((startWindowId, minWindowValue))))
-//      } // 如果开头缺失则找它最近时间的值补全（线性插值时这样）
-//
-//      if (maxWindowId != endWindowId) {
-//        rdd = rdd.union(sparkContext.parallelize(Seq((endWindowId, maxWindowValue))))
-//      } // 如果结尾缺失则找它最近时间的值补全（线性插值时这样）
-//
-//      /** 2)获得非空分区的数目 */
-//      val numParts = rdd.partitions.length
-//
-//      /** 3)根据窗口id进行重分区 */
-//      class PartitionByWindowId(numParts: Int) extends Partitioner {
-//        override def numPartitions: Int = numParts
-//
-//        override def getPartition(key: Any): Int =
-//          key match {
-//            case i: Long =>
-//              (i / numParts).toInt // 必定大于等于0
-//            case _: Exception =>
-//              throw new SparkException("key的类型不是long")
-//          }
-//
-//      }
-//      val rddPartitionByWinId: RDD[(Long, Row)] = rdd.partitionBy(new PartitionByWindowId(numParts))
-//
-//      /** 4)定义分区方式 windowId / numParts, 如果 */
-//      rddPartitionByWinId.mapPartitionsWithIndex {
-//        (partitionId, iter) =>
-//          if (partitionId != numParts - 1 && partitionId != 0) { // 将第一个数据备双份
-//            val partitionNum = (partitionId.toLong + 1) << 33
-//            var i = 0
-//            val result = mutable.ArrayBuilder.make[(Long, Row)]()
-//            iter.foreach {
-//              case (windowId, value) => {
-//                i += 1
-//                if (i == 1) {
-//                  result += Tuple2(partitionNum - 1, value)
-//                  result += Tuple2(partitionNum, value)
-//                } else {
-//                  result += Tuple2(partitionNum + i - 1, value)
-//                }
-//              }
-//            }
-//            val mm: Iterator[(Long, Row)] = result.result().toIterator
-//            mm
-//          } else if (partitionId != 0) { // 如果是第一个分区此时不用第一个元素双份，但是如果没有windowId = minWindowId应该加上
-//            new Iterator
-//          } else { // 最后一个分区，第一个元素双份，如果没有windowId =
-//            new Iterator
-//          }
-//
-//
-//      }
-//
-//
-//      class OverLapPartitioner(numParts: Int) extends Partitioner {
-//        override def numPartitions: Int = numParts
-//
-//        override def getPartition(key: Any): Int = {
-//          val id = key match {
-//            case i: Long =>
-//              (i >> 33) - 1
-//            case _: Exception =>
-//              throw new SparkException("key的类型不是long")
-//          }
-//          val modNum = (id % numParts).toInt
-//          if (modNum < 0) modNum + numParts else modNum
-//        }
-//      }
-//
-//      val rePartitionRdd = partitionMaterial.partitionBy(new OverLapPartitioner(4))
-//      val sum = rePartitionRdd.map(_._2).mapPartitions(
-//        iter => {
-//          var result = 0.0
-//          var lastValue = 1.0
-//          while (iter.hasNext) {
-//            val value = iter.next()
-//            result += value * lastValue
-//            lastValue = value
-//          }
-//          Array(result).toIterator
-//        }
-//      ).reduce(_ + _)
-//      println("最终结果:" + sum)
-//
-//      val endTime1 = System.nanoTime()
-//      val costTime1 = (endTime1 - startTime1) / 1000
-//      println(s"花费时间:${costTime1}毫秒")
-//      costTime1
-//    }
+    def windowComplement(startWindowId: Long, endWindowId: Long) = {
+      /** 1)根据窗口id生成PairRDD并相机补全最大最小值 */
+      var rdd: RDD[(Long, Row)] = DFAfterReduction.rdd.map {
+        row =>
+          (row.getAs[Long](binningIdColName), Row.fromSeq(row.toSeq.drop(1)))
+      }
 
+      val (minWindowId, minWindowValue) = rdd.min()(Ordering.by[(Long, Row), Long](_._1))
+      val (maxWindowId, maxWindowValue) = rdd.max()(Ordering.by[(Long, Row), Long](_._1))
+      if (minWindowId != startWindowId) {
+        println("minWindowId", minWindowId, startWindowId)
+        rdd = rdd.union(sparkContext.parallelize(Seq((startWindowId, minWindowValue))))
+      } // 如果开头缺失则找它最近时间的值补全（线性插值时这样）
+
+      if (maxWindowId != endWindowId) {
+        rdd = rdd.union(sparkContext.parallelize(Seq((endWindowId, maxWindowValue))))
+      } // 如果结尾缺失则找它最近时间的值补全（线性插值时这样）
+
+      /** 2)获得非空分区的数目 */
+      val numParts = 4
+      //        rdd.partitions.length
+
+      /** 3)根据窗口id进行重分区 */
+      class PartitionByWindowId(numParts: Int) extends Partitioner {
+        override def numPartitions: Int = numParts
+
+        override def getPartition(key: Any): Int =
+          key match {
+            case i: Long =>
+              (i / numParts).toInt // 必定大于等于0
+            case _: Exception =>
+              throw new SparkException("key的类型不是long")
+          }
+
+      }
+      val rddPartitionByWinId: RDD[(Long, Row)] = rdd.repartitionAndSortWithinPartitions(
+        new PartitionByWindowId(numParts)
+      ) // 确保分区后的顺序
+
+      println("partition前")
+      rddPartitionByWinId.mapPartitionsWithIndex {
+        case (index, iter) =>
+          iter.map(v => (index, v))
+      }.collect().sortBy(_._1).foreach(println)
+
+      /** 4)定义分区 */
+      class OverLapPartitioner(numParts: Int) extends Partitioner {
+        override def numPartitions: Int = numParts
+
+        override def getPartition(key: Any): Int = {
+          val id = key match {
+            case i: Long =>
+              i >> 33
+            case _: Exception =>
+              throw new SparkException("key的类型不是long")
+          }
+          val modNum = (id % numParts).toInt
+          if (modNum < 0) modNum + numParts else modNum
+        }
+      }
+
+      val rePartitionRdd: RDD[(Long, (Long, Row))] = rddPartitionByWinId.mapPartitionsWithIndex {
+        (partitionId, iter) =>
+          val partitionNum = partitionId.toLong << 33
+          var i = 0
+          val result = mutable.ArrayBuilder.make[(Long, (Long, Row))]()
+          iter.foreach {
+            value =>
+              i += 1
+              if (partitionId != 0 && i == 1) {
+                result += Tuple2(partitionNum - 1, value)
+                result += Tuple2(partitionNum, value)
+              } else {
+                result += Tuple2(partitionNum + i - 1, value)
+              }
+
+          }
+          result.result().toIterator
+      }.partitionBy(new OverLapPartitioner(numParts))
+
+      println("partition后")
+      rePartitionRdd.mapPartitionsWithIndex {
+        case (index, iter) =>
+          iter.map(v => (index, v))
+      }.collect().sortBy(_._1).foreach(println)
+
+
+
+      //      /** 按起止id补全 */
+      //      val resultRdd = rePartitionRdd.mapPartitions(
+      //        iter => {
+      //          val result = mutable.ArrayBuilder.make[(Long, (Long, Row))]()
+      //
+      //          var lastWindowId = 0L
+      //          var plus = 0L // 循环计数器
+      //          var lastRow: Row = null
+      //          var i = 0
+      //          var lastKey = 0L
+      //          while (iter.hasNext){
+      //            val (key, (windowId, row)) = iter.next()
+      //
+      //            if(i == 0) {
+      //              result += Tuple2(key + plus, (windowId, row))
+      //              lastWindowId = windowId
+      //              lastKey = key
+      //              lastRow = row
+      //              plus += 1
+      //            } else {
+      //              for (each <- 1L to (windowId - lastWindowId)) {
+      //                result += Tuple2(lastKey + plus, (lastWindowId + each, fillValue(lastRow, row)))
+      //                //          lastKey += 1
+      //                plus += 1
+      //              }
+      //
+      //              lastWindowId = windowId
+      //              lastRow = row
+      //            }
+      //
+      //            i += 1
+      //          }
+      //
+      //          result.result().dropRight(1).toIterator
+      //        }
+      //      )
+      //
+      //      resultRdd
+    }
+
+    windowComplement(0, 14)
+
+
+
+
+    //    def fillValue(starRow: Row, endRow: Row): Row = {
+    //      Row.fromSeq(starRow.toSeq.zip(endRow.toSeq).map { case (v1, v2) => v1.asInstanceOf[Double] + v2.asInstanceOf[Double]})
+    //    }
+    //
+    //    val u = windowComplement(0, 14)
+    //
+    //    u.mapPartitionsWithIndex{
+    //      case (index, iter) =>
+    //        iter.map(v => (index, v))
+    //    }.collect().sortBy(_._1).foreach(println)
+
+
+    //    (0,(8589934594,  (6,[200.0,48.0,-15.0])))
+    //    (0,(8589934595,  (7,[2.0,-100.0,-30.0])))
+    //    (0,(8589934592,  (4,[-200.0,100.0,50.0])))
+    //    (0,(8589934593,  (5,[-1.0,198.0,50.0])))
+    //
+    //    (1,(17179869187, (11,[20.0,-100.0,-30.0])))
+    //    (1,(17179869188, (12,[142.0,-200.0,-165.0])))
+    //    (1,(17179869188, (12,[142.0,-200.0,-165.0])))
+    //    (1,(17179869188, (12,[142.0,-200.0,-165.0])))
+    //    (1,(17179869189, (13,[142.0,-200.0,-165.0])))
+    //    (1,(17179869184, (8,[90.0,0.0,-1.0])))
+    //    (1,(17179869185, (9,[180.0,0.0,-2.0])))
+    //    (1,(17179869186, (10,[91.0,-50.0,-16.0])))
+    //
+    //    (3,(0,           (0,[123.0,-150.0,-150.0])))
+    //    (3,(1,           (1,[38.0,-200.0,-165.0])))
+    //    (3,(2,           (2,[218.0,-158.0,-300.0])))
+    //    (3,(3,           (3,[200.0,42.0,-300.0])))
+
+    // repartition是无序还是foreach println是无序
 
   }
+
+
+
 }
