@@ -77,7 +77,7 @@ object learning extends myAPP{
 
       val partitionMaterial: RDD[(Long, String)] = rdd.mapPartitionsWithIndex {
         (index, iter) => {
-          val partitionNum = (index.toLong + 1) << 33
+          val partitionNum = index.toLong << 33
           var i = 0
           val result = mutable.ArrayBuilder.make[(Long, String)]()
           iter.foreach {
@@ -102,7 +102,7 @@ object learning extends myAPP{
         override def getPartition(key: Any): Int = {
           val id = key match {
             case i: Long =>
-              (i >> 33) - 1
+              i >> 33
             case _: Exception =>
               throw new SparkException("key的类型不是long")
           }
@@ -111,10 +111,36 @@ object learning extends myAPP{
         }
       }
 
-      val rdd2 = partitionMaterial.partitionBy(new OverLapPartitioner(4)).map(_._2)
+      val rdd2 = partitionMaterial.partitionBy(new OverLapPartitioner(4))
 
-      val res2 = rdd2.mapPartitionsWithIndex{(index, iter) => Array((index, iter.toArray)).toIterator}.reduceByKey(_ ++ _)
-      res2.collectAsMap().foreach(iter => println(iter._1, iter._2.mkString(",")))
+      sc.getConf.get("")
+
+
+//        .map(_._2)
+      rdd2.mapPartitionsWithIndex {
+        case (index, iter) =>
+          iter.map(v => (index, v))
+      }.collect().sortBy(_._1).foreach(println)
+
+      rdd2.mapPartitionsWithIndex {
+        case (index, iter) =>
+          iter.toArray.head
+          Iterator((index, Some(iter.toArray.head)))
+      }.collect().sortBy(_._1).foreach(println)
+
+
+
+      val rdd3 = partitionMaterial.map { case (key, value) => (key % 4, value)}.groupByKey()
+        .mapValues(iter => iter.mkString(","))
+
+      rdd3.collect().sortBy(_._1).foreach(println)
+
+
+
+
+
+      /*      val res2 = rdd2.mapPartitionsWithIndex{(index, iter) => Array((index, iter.toArray)).toIterator}.reduceByKey(_ ++ _)
+            res2.collectAsMap().foreach(iter => println(iter._1, iter._2.mkString(",")))*/
 
 //      (2,N,O,P,Q,R,S)
 //      (1,G,H,I,J,K,L,M)
@@ -141,8 +167,12 @@ object learning extends myAPP{
 
     }
 
+    println("-"*30 + "分割线111" + "-"*30)
+
+    testPartition()
 
 
+    sc.parallelize(Seq.range(0, 100), 10).map(i => i * 10).map(i => i + 1).reduce(_ + _)
 
 
     /**
@@ -238,11 +268,11 @@ object learning extends myAPP{
       costTime1
     }
 
-    println()
-    println()
-    println("-"*30 + "分割线" + "-"*30)
-    println()
-    println()
+//    println()
+//    println()
+//    println("-"*30 + "分割线" + "-"*30)
+//    println()
+//    println()
 
 
     def test2(): Long = {
@@ -256,6 +286,8 @@ object learning extends myAPP{
       println(s"花费时间:${costTime2}毫秒")
       costTime2
     }
+
+
     // 本地测试一次1000数据
 //    最终结果:47.05076687713064
 //    花费时间:706524毫秒
@@ -271,19 +303,21 @@ object learning extends myAPP{
 //    最终结果:3075.894099593756
 //    花费时间:12812115毫秒
 
-    // 平台测试10次
-    var time1 = 0L
-    var time2 = 0L
-    var i = 0
-    while (i < 10) {
-      time1 += test1()
-      time2 += test2()
-      i += 1
-    }
 
-    println("-"*100)
-    println("time1:" + time1)
-    println("time2:" + time2)
+
+//    // 平台测试10次
+//    var time1 = 0L
+//    var time2 = 0L
+//    var i = 0
+//    while (i < 10) {
+//      time1 += test1()
+//      time2 += test2()
+//      i += 1
+//    }
+//
+//    println("-"*100)
+//    println("time1:" + time1)
+//    println("time2:" + time2)
 
 
 
