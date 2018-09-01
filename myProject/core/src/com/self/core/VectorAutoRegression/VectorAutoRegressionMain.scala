@@ -20,22 +20,70 @@ object VectorAutoRegressionMain extends myAPP{
     val timeParser = new java.text.SimpleDateFormat("yyyy-MM")
 
     val seq = List(
-      ("1", "2017-08", 199, 0, 197),
-      ("1", "2017-01", 123, -150, -150),
-      ("1", "2017-02", 9, -150, -150),
-      ("1", "2017-02", 19, -10, -150),
-      ("1", "2017-03", 19, -150, -150),
-      ("1", "2017-07", 1, 50, -150),
-      ("1", "2017-05", 199, -8, -150),
-      ("1", "2017-07", 120, 7, 0),
-      ("1", "2017-09", -200, 100, 50),
+      ("1", "2014-08", 199, 0, 197),
+      ("1", "2014-01", 123, -150, -150),
+      ("1", "2014-02", 9, -150, -150),
+      ("1", "2014-02", 19, -10, -150),
+      ("1", "2014-03", 19, -150, -150),
+      ("1", "2014-07", 1, 50, -150),
+      ("1", "2014-05", 199, -8, -150),
+      ("1", "2014-07", 120, 7, 0),
+      ("1", "2014-09", -200, 100, 50),
+      ("2", "2014-01", 99, -70, -150),
+      ("2", "2015-02", 1, -50, -15),
+      ("2", "2015-07", 90, -0, -1),
+      ("2", "2015-08", 19, -50, -15),
+      ("2", "2015-09", 1, -50, -15),
+      ("2", "2015-10", 90, -0, -1),
+      ("2", "2015-11", 19, -50, -15),
+      ("1", "2016-08", 199, 0, 197),
+      ("1", "2016-01", 123, -150, -150),
+      ("1", "2016-02", 9, -150, -150),
+      ("1", "2016-02", 19, -10, -150),
+      ("1", "2016-03", 19, -150, -150),
+      ("1", "2016-07", 1, 50, -150),
+      ("1", "2016-05", 199, -8, -150),
+      ("1", "2016-07", 120, 7, 0),
+      ("1", "2016-09", -200, 100, 50),
       ("2", "2017-01", 99, -70, -150),
-      ("2", "2018-02", 1, -50, -15),
-      ("2", "2018-07", 90, -0, -1),
-      ("2", "2018-08", 19, -50, -15),
-      ("2", "2018-09", 1, -50, -15),
-      ("2", "2018-10", 90, -0, -1),
-      ("2", "2018-11", 19, -50, -15)
+      ("2", "2017-02", 1, -50, -15),
+      ("2", "2017-07", 90, -0, -1),
+      ("2", "2017-08", 19, -50, -15),
+      ("2", "2017-09", 1, -50, -15),
+      ("2", "2017-10", 90, -0, -1),
+      ("2", "2017-11", 19, -50, -15),
+      ("1", "2018-08", 199, 0, 197),
+      ("1", "2018-01", 123, -150, -150),
+      ("1", "2018-02", 9, -150, -150),
+      ("1", "2018-02", 19, -10, -150),
+      ("1", "2018-03", 19, -150, -150),
+      ("1", "2018-07", 1, 50, -150),
+      ("1", "2018-05", 199, -8, -150),
+      ("1", "2018-07", 120, 7, 0),
+      ("1", "2018-09", -200, 100, 50),
+      ("2", "2019-01", 99, -70, -150),
+      ("2", "2019-02", 1, -50, -15),
+      ("2", "2019-07", 90, -0, -1),
+      ("2", "2019-08", 19, -50, -15),
+      ("2", "2019-09", 1, -50, -15),
+      ("2", "2019-10", 90, -0, -1),
+      ("2", "2019-11", 19, -50, -15),
+      ("1", "2020-08", 199, 0, 197),
+      ("1", "2020-01", 123, -150, -150),
+      ("1", "2020-02", 9, -150, -150),
+      ("1", "2020-02", 19, -10, -150),
+      ("1", "2020-03", 19, -150, -150),
+      ("1", "2020-07", 1, 50, -150),
+      ("1", "2020-05", 199, -8, -150),
+      ("1", "2020-07", 120, 7, 0),
+      ("1", "2020-09", -200, 100, 50),
+      ("2", "2021-01", 99, -70, -150),
+      ("2", "2021-02", 1, -50, -15),
+      ("2", "2021-07", 90, -0, -1),
+      ("2", "2021-08", 19, -50, -15),
+      ("2", "2021-09", 1, -50, -15),
+      ("2", "2021-10", 90, -0, -1),
+      ("2", "2021-11", 19, -50, -15)
     ).map(tup => (tup._1, new java.sql.Timestamp(timeParser.parse(tup._2).getTime), tup._3, tup._4, tup._5))
 
     val newDataFrame = sqlc.createDataFrame(seq).toDF("id", "dayTime", "x", "y", "z")
@@ -51,9 +99,11 @@ object VectorAutoRegressionMain extends myAPP{
     createData()
 
     /** 0)获得数据和一些初始信息 */
-    val jsonparam = """{"RERUNNING":{"nodeName":"时间序列规整_1","preNodes":[{"checked":true,"id":"模拟时间序列_XFdCFEE5"}],"rerun":"false"},"inputTableName":"模拟时间序列_XFdCFEE5","timeSeriesFormat":{"reduction":"first","startEndTime":["2017-01-01 00:00:00","2019-01-01 00:00:00"],"timeColName":[{"datatype":"timestamp","index":1,"name":"dayTime"}],"timeWindowIdCol":"windowIdCol","value":"timeCol","windowLength":"2","windowUnit":"month"},"variablesColNames":[{"datatype":"int","index":2,"name":"x"},{"datatype":"int","index":3,"name":"y"},{"datatype":"int","index":4,"name":"z"}]}"""
+    val jsonparam =
+      """{"RERUNNING":{"nodeName":"时间序列规整_1","preNodes":[{"checked":true,"id":"模拟时间序列_XFdCFEE5"}],"rerun":"false"},"inputTableName":"模拟时间序列_XFdCFEE5","timeSeriesFormat":{"reduction":"first","startEndTime":["2014-01-01 00:00:00","2022-01-01 00:00:00"],"timeColName":[{"datatype":"timestamp","index":1,"name":"dayTime"}],"timeWindowIdCol":"windowIdCol","value":"timeCol","windowLength":"1","windowUnit":"month"},"variablesColNames":[{"datatype":"int","index":2,"name":"x"},{"datatype":"int","index":3,"name":"y"},{"datatype":"int","index":4,"name":"z"}]}"""
     val parser = new JsonParser()
     val pJsonParser = parser.parse(jsonparam).getAsJsonObject
+    val z1 = outputrdd
     val rddTableName = "时间序列规整_1_pKdufqmW"
 
     val tableName = pJsonParser.get("inputTableName").getAsString
@@ -137,6 +187,7 @@ object VectorAutoRegressionMain extends myAPP{
           .filter(col(binningIdColName).between(0, endWindowId))
 
         /** 2)每个窗口进行规约 --规约方式可以为最大、最小、均值、最早四种方式，如果一个窗口内某个变量全为null值则规约为Double.NaN值 */
+
         val reduction = timeSeriesFormatObj.get("reduction").getAsString // "min", "mean", "first"
       val dFAfterReduction: DataFrame = reduction match {
         case "max" =>
@@ -223,12 +274,7 @@ object VectorAutoRegressionMain extends myAPP{
 
       /** 2)获得非空分区的数目 */
       /** 最后一个非空分区的id */
-      val numParts = rdd.mapPartitions {
-        iter =>
-          if (iter.isEmpty) Iterator.empty else Iterator(1)
-      }.count().toInt
 
-      println(s"算子检测到原始分区数为${rdd.partitions.length}, 实际分区数为$numParts, 现已将空分区去除")
 
       /** 3)根据窗口id进行重分区 */
       class PartitionByWindowId(numParts: Int) extends Partitioner {
@@ -243,9 +289,31 @@ object VectorAutoRegressionMain extends myAPP{
               throw new SparkException("key的类型不是long")
           }
       }
-      val rddPartitionByWinId: RDD[(Long, Seq[Double])] = rdd.coalesce(numParts).repartitionAndSortWithinPartitions(
-        new PartitionByWindowId(numParts)
+      val rddPartitionByWinId: RDD[(Long, Seq[Double])] = rdd.repartitionAndSortWithinPartitions(
+        new PartitionByWindowId(rdd.partitions.length)
       ) // 确保分区后的顺序
+
+      println("之前的数据")
+      rddPartitionByWinId.mapPartitionsWithIndex {
+        case (partitionId, iter) =>
+          Iterator(s"分区$partitionId", iter.map(_._1).mkString(","))
+      }.collect().foreach(println)
+
+
+
+      val numParts = rddPartitionByWinId.mapPartitions {
+        iter =>
+          if (iter.isEmpty) Iterator.empty else Iterator(1)
+      }.reduce(_ + _)
+
+      println(s"算子检测到原始分区数为${rdd.partitions.length}, 实际分区数为$numParts, 现已将空分区去除")
+
+      println("去除分区后的数据为")
+      rddPartitionByWinId.coalesce(numParts).mapPartitionsWithIndex {
+        case (partitionId, iter) =>
+          Iterator(s"分区$partitionId", iter.map(_._1).mkString(","))
+      }.collect().foreach(println)
+
 
       /** 4)定义分区 */
       class OverLapPartitioner(numParts: Int) extends Partitioner {
@@ -263,7 +331,9 @@ object VectorAutoRegressionMain extends myAPP{
         }
       }
 
-      val rePartitionRdd: RDD[(Long, (Long, Seq[Double]))] = rddPartitionByWinId.mapPartitionsWithIndex {
+
+      val rePartitionRdd: RDD[(Long, (Long, Seq[Double]))] = rddPartitionByWinId.coalesce(numParts) // 需要去空分区，否则会丢掉中间key
+        .mapPartitionsWithIndex {
         (partitionId, iter) =>
           val partitionNum = partitionId.toLong << 33
           var i = 0
@@ -281,11 +351,20 @@ object VectorAutoRegressionMain extends myAPP{
           result.result().toIterator
       }.partitionBy(new OverLapPartitioner(numParts))
 
+
+      println("补全id之前")
+      rePartitionRdd.mapPartitionsWithIndex {
+        case (partitionId, iter) =>
+          Iterator(s"分区$partitionId", iter.map(_._2._1).mkString(","))
+      }.collect().foreach(println)
+
+
       val maxPartitionIndex = rePartitionRdd.mapPartitionsWithIndex {
         case (index, iter) =>
           if (iter.isEmpty) Iterator.empty else Iterator(index)
       }.max()
 
+      println(s"最大非空分区id为${maxPartitionIndex}")
       /** 按起止id补全 */
       val resultRdd = rePartitionRdd.mapPartitionsWithIndex(
         (index, iters) => {
@@ -330,6 +409,12 @@ object VectorAutoRegressionMain extends myAPP{
         }
       )
 
+      println("补全id之后")
+      resultRdd.mapPartitionsWithIndex {
+        case (partitionId, iter) =>
+          Iterator(s"分区$partitionId", iter.map(_._2._1).mkString(","))
+      }.collect().foreach(println)
+
       sQLContext.createDataFrame(resultRdd.values.map { case (windowId, values) => Row.fromSeq(windowId +: values) },
         StructType(StructField(binningIdColName, LongType) +: variablesColNames.map(name => StructField(name, DoubleType)))
       )
@@ -349,9 +434,11 @@ object VectorAutoRegressionMain extends myAPP{
 
     println("This is a test file.")
     /** 0)获得数据和一些初始信息 */
-    val jsonparam = """{"RERUNNING":{"nodeName":"时间序列规整_1","preNodes":[{"checked":true,"id":"模拟时间序列_XFdCFEE5"}],"rerun":"false"},"inputTableName":"模拟时间序列_XFdCFEE5","timeSeriesFormat":{"reduction":"first","startEndTime":["2017-01-01 00:00:00","2019-01-01 00:00:00"],"timeColName":[{"datatype":"timestamp","index":1,"name":"dayTime"}],"timeWindowIdCol":"windowIdCol","value":"timeCol","windowLength":"2","windowUnit":"month"},"variablesColNames":[{"datatype":"int","index":2,"name":"x"},{"datatype":"int","index":3,"name":"y"},{"datatype":"int","index":4,"name":"z"}]}"""
+    val jsonparam =
+      """{"RERUNNING":{"nodeName":"时间序列规整_1","preNodes":[{"checked":true,"id":"模拟时间序列_XFdCFEE5"}],"rerun":"false"},"inputTableName":"时间序列规整_1_pKdufqmW","timeSeriesFormat":{"reduction":"first","startEndTime":["2017-01-01 00:00:00","2019-01-01 00:00:00"],"timeColName":[{"datatype":"timestamp","index":1,"name":"dayTime"}],"timeWindowIdCol":"windowIdCol","value":"timeCol","windowLength":"2","windowUnit":"month"},"variablesColNames":[{"datatype":"int","index":2,"name":"x"},{"datatype":"int","index":3,"name":"y"},{"datatype":"int","index":4,"name":"z"}]}"""
     val parser = new JsonParser()
     val pJsonParser = parser.parse(jsonparam).getAsJsonObject
+    val z1 = outputrdd
     val rddTableName = "时间序列规整_1_pKdufqmW"
 
     val tableName = pJsonParser.get("inputTableName").getAsString
@@ -375,7 +462,7 @@ object VectorAutoRegressionMain extends myAPP{
     val variablesColNames = Array.range(0, variablesColObj.size()).map {
       i =>
         val name = variablesColObj.get(i).getAsJsonObject.get("name").getAsString
-        Tools.columnTypesIn(name, rawDataFrame, true, StringType, DoubleType, IntegerType, LongType, FloatType, ByteType)
+        Tools.columnTypesIn(name, rawDataFrame, true, DoubleType)
         name
     }
 
@@ -385,23 +472,21 @@ object VectorAutoRegressionMain extends myAPP{
     val p = 3 // 阶
     val timeT = rawDataFrame.count()
 
+    println("有多少个序列", timeT)
+
     require(timeT < (1.toLong << 32), "目前算法要求时间序列数目不大于2的32次方")
     val requireCount = k * k * p + (k + 1) * k / 2
     require(timeT > requireCount.toLong, s"根据您输入的滞后阶数和变量列数，模型总共需要估计${requireCount}个参数，" +
-      s"数据条数需要超过该数才满足过度识别条件") // k*k*p + (k + 1)*k/2
-
-  }
-
-
-  override def run(): Unit = {
+      s"时间序列序列数需要超过该数才满足过度识别条件, 您输入的序列数有${timeT}个, " +
+      s"您可以增加序列数或者减少‘滞后阶数’或‘变量数’") // k*k*p + (k + 1)*k/2
 
 
-    val data = Seq.range(0, 200).map(i => (i.toLong, Array(1, 2, 3.0)))
-    val rdd = sc.makeRDD(data)
-
-    val timeT = rdd.count()
-    val p = 5
-
+    val rdd = rawDataFrame.rdd.map {
+      row =>
+        val windowId = row.getAs[Long](windowIdColName)
+        val features = variablesColNames.map(name => row.getAs[Double](name))
+        (windowId, features)
+    }
 
     def findMiddleTwo(width: Long, length: Long)(z: Long): Seq[Long] = {
       Seq(0L, z, z - width, length).sorted.slice(1, 3) // 取中间两个
@@ -412,44 +497,51 @@ object VectorAutoRegressionMain extends myAPP{
     val changeRdd: RDD[(Long, (Int, Array[Double]))] = rdd.flatMap {
       row =>
         val windowId = row._1
-        val Seq(start, end) = findMiddleTwo(p, timeT - 1 - p )(windowId)
+        val Seq(start, end) = findMiddleTwo(p, timeT - 1 - p)(windowId)
 
         val res = mutable.ArrayBuilder.make[(Long, (Int, Array[Double]))]()
         var dst_window = end
-        while(dst_window >= start) {
-          res += Tuple2(dst_window, Tuple2((windowId - dst_window).toInt, row._2))
+        while (dst_window >= start) {
+          res += Tuple2(dst_window, Tuple2((windowId - dst_window).toInt, row._2)) // (发往窗口id, (滞后阶数, 对应值))
           dst_window -= 1
         }
         res.result()
     }
 
-    val zeroValue: mutable.Set[(Int, Array[Double])] = scala.collection.mutable.Set.empty
-    val seqOp = (map: mutable.Set[(Int, Array[Double])], value: (Int, Array[Double])) => {
-      map += value
-      map
-    }
+    changeRdd.collect().sortBy(_._1).foreach(println)
 
-    val resultRdd = changeRdd.aggregateByKey(zeroValue)(seqOp, (m1, m2) => m1 ++ m2).mapValues {
-      set =>
-        set.toArray.sortBy(_._1)
-    }
-
-    println("-"*80)
-
-    resultRdd.collect().sortBy(_._1).foreach{
-      case (key, arr) =>
-        println(s"key:$key", s"lag: ${arr.map(_._1).mkString(",")}")
-    }
-
-
-
-
+    //    val zeroValue: mutable.Set[(Int, Array[Double])] = scala.collection.mutable.Set.empty
+    //    val seqOp = (map: mutable.Set[(Int, Array[Double])], value: (Int, Array[Double])) => {
+    //      map += value
+    //      map
+    //    }
+    //
+    //    val resultRdd = changeRdd.aggregateByKey(zeroValue)(seqOp, (m1, m2) => m1 ++ m2).mapValues {
+    //      set =>
+    //        set.toArray.sortBy(_._1)
+    //    }
+    //
+    //    println("-"*80)
+    //
+    //    resultRdd.collect().sortBy(_._1).foreach{
+    //      case (windowId, features) =>
+    //        println(s"$windowId, ${features.mkString(", ")}")
+    //    }
 
 
+  }
 
 
+  override def run(): Unit = {
+    //    val values = Array("y1", "y2", "y3")
+    //
+    //    val res  = Array.range(0, 5 + 1).flatMap(i => values.flatMap(dim1 => values.map(name => name + " * " + s"lag($dim1, $i)"))).mkString(", ")
+    //    println(res)
+
+    testTimeSeriesWarping()
 
 
+    //    testVAR()
 
 
   }
