@@ -452,10 +452,10 @@ object VectorAutoRegressionMain extends myAPP{
     val sQLContext = rawDataFrame.sqlContext
     val sparkContext = sQLContext.sparkContext
 
-    rawDataFrame.show()
-
-
     val windowIdColName = "windowIdCol"
+
+    rawDataFrame.orderBy(col(windowIdColName)).show()
+
     Tools.columnTypesIn(windowIdColName, rawDataFrame, true, LongType)
 
     val variablesColObj = pJsonParser.get("variablesColNames").getAsJsonArray
@@ -494,6 +494,9 @@ object VectorAutoRegressionMain extends myAPP{
 
     case class Meta(lag: Int, value: Array[Double])
 
+    println("增加之前:")
+    println(rdd.keys.collect().sorted.mkString(","))
+
     val changeRdd: RDD[(Long, (Int, Array[Double]))] = rdd.flatMap {
       row =>
         val windowId = row._1
@@ -507,26 +510,26 @@ object VectorAutoRegressionMain extends myAPP{
         }
         res.result()
     }
-
+    println("补全之后")
     changeRdd.collect().sortBy(_._1).foreach(println)
 
-    //    val zeroValue: mutable.Set[(Int, Array[Double])] = scala.collection.mutable.Set.empty
-    //    val seqOp = (map: mutable.Set[(Int, Array[Double])], value: (Int, Array[Double])) => {
-    //      map += value
-    //      map
-    //    }
-    //
-    //    val resultRdd = changeRdd.aggregateByKey(zeroValue)(seqOp, (m1, m2) => m1 ++ m2).mapValues {
-    //      set =>
-    //        set.toArray.sortBy(_._1)
-    //    }
-    //
-    //    println("-"*80)
-    //
-    //    resultRdd.collect().sortBy(_._1).foreach{
-    //      case (windowId, features) =>
-    //        println(s"$windowId, ${features.mkString(", ")}")
-    //    }
+        val zeroValue: mutable.Set[(Int, Array[Double])] = scala.collection.mutable.Set.empty
+        val seqOp = (map: mutable.Set[(Int, Array[Double])], value: (Int, Array[Double])) => {
+          map += value
+          map
+        }
+
+        val resultRdd = changeRdd.aggregateByKey(zeroValue)(seqOp, (m1, m2) => m1 ++ m2).mapValues {
+          set =>
+            set.toArray.sortBy(_._1)
+        }
+
+//        println("-"*80)
+//
+//        resultRdd.collect().sortBy(_._1).foreach{
+//          case (windowId, features) =>
+//            println(s"$windowId, ${features.mkString(", ")}")
+//        }
 
 
   }
@@ -538,10 +541,9 @@ object VectorAutoRegressionMain extends myAPP{
     //    val res  = Array.range(0, 5 + 1).flatMap(i => values.flatMap(dim1 => values.map(name => name + " * " + s"lag($dim1, $i)"))).mkString(", ")
     //    println(res)
 
-    testTimeSeriesWarping()
+//    testTimeSeriesWarping()
 
-
-    //    testVAR()
+    testVAR()
 
 
   }
