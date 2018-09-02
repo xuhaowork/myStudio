@@ -2,20 +2,20 @@ package com.self.core.VectorAutoRegression
 
 import java.sql.Timestamp
 
+import breeze.linalg.{DenseMatrix, DenseVector}
 import com.google.gson.JsonParser
 import com.self.core.VectorAutoRegression.utils.ToolsForTimeSeriesWarp
 import com.self.core.baseApp.myAPP
 import com.self.core.featurePretreatment.utils.Tools
-import org.apache.spark.{Partitioner, SparkException}
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.{DataFrame, NullableFunctions, Row}
 import org.apache.spark.sql.functions._
 import org.apache.spark.sql.types._
+import org.apache.spark.sql.{DataFrame, NullableFunctions, Row}
 
 import scala.collection.mutable
 
 
-object VectorAutoRegressionMain extends myAPP{
+object VectorAutoRegressionMain extends myAPP {
   def createData(): Unit = {
     val timeParser = new java.text.SimpleDateFormat("yyyy-MM")
 
@@ -226,202 +226,94 @@ object VectorAutoRegressionMain extends myAPP{
         val df = sQLContext.createDataFrame(rawDataDF.rdd.zipWithIndex().map {
           case (row, windowId) =>
             Row.merge(Row(windowId), row)
-        }, StructType(StructField(binningIdColName, LongType) +: schema))
+        }, StructType(StructField(binningIdColName, LongType) +: schema)) // @todo: 需要将变量的类型转为double
 
         (df, endWindowId)
     }
 
+
     /** 3)窗口补全和记录补全 */
-    // 补全方式 "mean", "zero", "linear"
-    def fillLinear(starRow: Seq[Double], gaps: Seq[Double], step: Int): Seq[Double] =
-      starRow.zip(gaps).map { case (d1, gap) => d1 + gap * step }
-
-    def windowComplement(dFAfterReduction: DataFrame, startWindowId: Long, endWindowId: Long, binningIdColName: String, format: String): DataFrame = {
-      /** 1)根据窗口id生成PairRDD并相机补全最大最小值 */
-      var rdd: RDD[(Long, Seq[Double])] = dFAfterReduction.rdd.map {
-        row =>
-          (row.getAs[Long](binningIdColName), row.toSeq.drop(1).map(_.asInstanceOf[Double]))
-      }
-
-      val ((minWindowId, minWindowValue), (maxWindowId, maxWindowValue)) =
-        try {
-          format match {
-            case "mean" =>
-              val row = dFAfterReduction.select(variablesColNames.map(name => mean(col(name))): _*).head()
-              ((rdd.keys.min(), row.toSeq.map(_.asInstanceOf[Double])),
-                (rdd.keys.max(), row.toSeq.map(_.asInstanceOf[Double])))
-            case "zero" =>
-              val row = Row.fromSeq(variablesColNames.map(_ => 0.0))
-              ((rdd.keys.min(), row.toSeq.map(_.asInstanceOf[Double])),
-                (rdd.keys.max(), row.toSeq.map(_.asInstanceOf[Double])))
-            case "linear" =>
-              (rdd.min()(Ordering.by[(Long, Seq[Double]), Long](_._1)),
-                rdd.max()(Ordering.by[(Long, Seq[Double]), Long](_._1)))
-          }
-        } catch {
-          case e: Exception => throw new Exception("在时间规整阶段获取最大时间分箱id失败，可能的原因是：" +
-            "1）数据有过多缺失值，在缺失值阶段数据为空，2）数据的时间列没有在时间序列起止时间内导致过滤后为空，" +
-            s"3）其他原因。具体信息: ${e.getMessage}")
-        }
-
-      if (minWindowId != startWindowId) {
-        rdd = rdd.union(sparkContext.parallelize(Seq((startWindowId, minWindowValue))))
-      } // 如果开头缺失则找它最近时间的值补全
-
-      if (maxWindowId != endWindowId) {
-        rdd = rdd.union(sparkContext.parallelize(Seq((endWindowId, maxWindowValue))))
-      } // 如果结尾缺失则找它最近时间的值补全
-
-      /** 2)获得非空分区的数目 */
-      /** 最后一个非空分区的id */
-
-
-      /** 3)根据窗口id进行重分区 */
-      class PartitionByWindowId(numParts: Int) extends Partitioner {
-        override def numPartitions: Int = numParts
-
-        override def getPartition(key: Any): Int =
-          key match {
-            case i: Long =>
-              val maxNumEachPartition = scala.math.ceil(endWindowId / numParts.toDouble) // 最小为1.0
-              (i / maxNumEachPartition).toInt // 必定大于等于0且小于numParts [[maxWindowId]]为最大值
-            case _: Exception =>
-              throw new SparkException("key的类型不是long")
-          }
-      }
-      val rddPartitionByWinId: RDD[(Long, Seq[Double])] = rdd.repartitionAndSortWithinPartitions(
-        new PartitionByWindowId(rdd.partitions.length)
-      ) // 确保分区后的顺序
-
-      println("之前的数据")
-      rddPartitionByWinId.mapPartitionsWithIndex {
-        case (partitionId, iter) =>
-          Iterator(s"分区$partitionId", iter.map(_._1).mkString(","))
-      }.collect().foreach(println)
-
-
-
-      val numParts = rddPartitionByWinId.mapPartitions {
-        iter =>
-          if (iter.isEmpty) Iterator.empty else Iterator(1)
-      }.reduce(_ + _)
-
-      println(s"算子检测到原始分区数为${rdd.partitions.length}, 实际分区数为$numParts, 现已将空分区去除")
-
-      println("去除分区后的数据为")
-      rddPartitionByWinId.coalesce(numParts).mapPartitionsWithIndex {
-        case (partitionId, iter) =>
-          Iterator(s"分区$partitionId", iter.map(_._1).mkString(","))
-      }.collect().foreach(println)
-
-
-      /** 4)定义分区 */
-      class OverLapPartitioner(numParts: Int) extends Partitioner {
-        override def numPartitions: Int = numParts
-
-        override def getPartition(key: Any): Int = {
-          val id = key match {
-            case i: Long =>
-              i >> 33
-            case _: Exception =>
-              throw new SparkException("key的类型不是long")
-          }
-          val modNum = (id % numParts).toInt
-          if (modNum < 0) modNum + numParts else modNum
-        }
-      }
-
-
-      val rePartitionRdd: RDD[(Long, (Long, Seq[Double]))] = rddPartitionByWinId.coalesce(numParts) // 需要去空分区，否则会丢掉中间key
-        .mapPartitionsWithIndex {
-        (partitionId, iter) =>
-          val partitionNum = partitionId.toLong << 33
-          var i = 0
-          val result = mutable.ArrayBuilder.make[(Long, (Long, Seq[Double]))]()
-          iter.foreach {
-            value =>
-              i += 1
-              if (partitionId != 0 && i == 1) {
-                result += Tuple2(partitionNum - 1, value)
-                result += Tuple2(partitionNum, value)
-              } else {
-                result += Tuple2(partitionNum + i - 1, value)
-              }
-          }
-          result.result().toIterator
-      }.partitionBy(new OverLapPartitioner(numParts))
-
-
-      println("补全id之前")
-      rePartitionRdd.mapPartitionsWithIndex {
-        case (partitionId, iter) =>
-          Iterator(s"分区$partitionId", iter.map(_._2._1).mkString(","))
-      }.collect().foreach(println)
-
-
-      val maxPartitionIndex = rePartitionRdd.mapPartitionsWithIndex {
-        case (index, iter) =>
-          if (iter.isEmpty) Iterator.empty else Iterator(index)
-      }.max()
-
-      println(s"最大非空分区id为${maxPartitionIndex}")
-      /** 按起止id补全 */
-      val resultRdd = rePartitionRdd.mapPartitionsWithIndex(
-        (index, iters) => {
-          val result = mutable.ArrayBuilder.make[(Long, (Long, Seq[Double]))]()
-
-          val iter = iters.toArray.sortBy(_._2._1).toIterator
-
-          var lastWindowId = 0L
-          var plus = 0L // 循环计数器
-          var lastRow: Seq[Double] = null
-          var i = 0
-          var lastKey = 0L
-          while (iter.hasNext) {
-            val (key, (windowId, row)) = iter.next()
-
-            if (i == 0) {
-              result += Tuple2(key + plus, (windowId, row))
-              lastWindowId = windowId
-              lastKey = key
-              lastRow = row
-              plus += 1
-            } else {
-              val gap = row.zip(lastRow).map(tup => (tup._1 - tup._2) / (windowId - lastWindowId)) // 等差数列线性填充
-              for (step <- 1 to (windowId - lastWindowId).toInt) {
-                val fillValue = if (format == "linear") fillLinear(lastRow, gap, step) else minWindowValue
-                result += Tuple2(lastKey + plus,
-                  (lastWindowId + step, if (step == (windowId - lastWindowId)) row else fillValue))
-                plus += 1
-              }
-
-              lastWindowId = windowId
-              lastRow = row
-            }
-
-            i += 1
-          }
-
-          if (index == maxPartitionIndex)
-            result.result().toIterator
-          else
-            result.result().dropRight(1).toIterator
-        }
-      )
-
-      println("补全id之后")
-      resultRdd.mapPartitionsWithIndex {
-        case (partitionId, iter) =>
-          Iterator(s"分区$partitionId", iter.map(_._2._1).mkString(","))
-      }.collect().foreach(println)
-
-      sQLContext.createDataFrame(resultRdd.values.map { case (windowId, values) => Row.fromSeq(windowId +: values) },
-        StructType(StructField(binningIdColName, LongType) +: variablesColNames.map(name => StructField(name, DoubleType)))
-      )
+    val format = "linear"
+    var rddAfterReduction = dFAfterReduction.rdd.map {
+      row =>
+        val windowId = row.getAs[Long](binningIdColName)
+        (windowId, variablesColNames.map(name => row.getAs[Double](name)))
+    }.sortByKey(ascending = true).zipWithIndex().map {
+      case ((windowId, features), index) =>
+        (index, (windowId, features))
     }
 
+    val (_, (minWindowId, minWindowValue)) = rddAfterReduction
+      .min()(Ordering.by[(Long, (Long, Array[Double])), Long](_._2._1))
+    val (maxIndex, (maxWindowId, maxWindowValue)) = rddAfterReduction
+      .max()(Ordering.by[(Long, (Long, Array[Double])), Long](_._2._1))
+
+    val (fillValues4min, fillValues4max) = try {
+      format match {
+        case "mean" =>
+          val res = dFAfterReduction.select(variablesColNames.map(name => mean(col(name))): _*)
+            .head().toSeq.map(_.asInstanceOf[Double])
+          (res.toArray, res.toArray)
+
+        case "zero" =>
+          (variablesColNames.map(_ => 0.0), variablesColNames.map(_ => 0.0))
+
+        case "linear" =>
+          (minWindowValue, maxWindowValue)
+      }
+    } catch {
+      case e: Exception => throw new Exception("在时间规整阶段获取最大时间分箱id失败，可能的原因是：" +
+        "1）数据有过多缺失值，在缺失值阶段数据为空，2）数据的时间列没有在时间序列起止时间内导致过滤后为空，" +
+        s"3）其他原因。具体信息: ${e.getMessage}")
+    }
+
+    if (minWindowId != 0L) {
+      rddAfterReduction = rddAfterReduction.union(sparkContext.parallelize(Seq((0L, (0L, fillValues4min)))))
+    } // 如果开头缺失则找它最近时间的值补全
+
+    if (maxWindowId != endWindowId) {
+      rddAfterReduction = rddAfterReduction.union(sparkContext.parallelize(Seq((maxIndex + 1, (endWindowId, fillValues4max)))))
+    } // 如果结尾缺失则找它最近时间的值补全
+
+    val rddLag = rddAfterReduction.map {
+      case (index, (windowId, features)) =>
+        (index - 1, (windowId, features))
+    }
+
+    // 补全方式 "mean", "zero", "linear"
+    def fillLinear(starRow: Array[Double], endRow: Array[Double], step: Int, gaps: Int): Array[Double] = {
+      endRow.zip(starRow).map { case (start, end) => start + (end - start) * step / gaps }
+    }
+
+    val res = rddAfterReduction.join(rddLag).flatMapValues {
+      case ((windowId1, features1), (windowId2, features2)) =>
+        val gaps = windowId2 - windowId1
+        format match {
+          case "mean" =>
+            (windowId1.toInt, features1) +: Array.range(
+              windowId1.toInt + 1, windowId2.toInt).map(index => (index, fillValues4min))
+
+          case "zero" =>
+            (windowId1.toInt, features1) +: Array.range(
+              windowId1.toInt + 1, windowId2.toInt).map(index => (index, fillValues4min))
+
+          case "linear" =>
+            Array.range(windowId1.toInt, windowId2.toInt).map(
+              step => (step, fillLinear(features1, features2, step - windowId1.toInt, gaps.toInt))) // @todo: 改成while循环创建
+        }
+    }.values
+
+
     /** 4)结果输出 */
-    val newDataFrame = windowComplement(dFAfterReduction, 0L, endWindowId, binningIdColName, "linear")
+
+    val newDataFrame = sQLContext.createDataFrame(
+      res.map {
+        case (windowId, values) => Row.fromSeq(windowId.toLong +: values)
+      },
+      StructType(
+        StructField(binningIdColName, LongType) +: variablesColNames.map(name => StructField(name, DoubleType))
+      )
+    )
 
     newDataFrame.show()
     newDataFrame.registerTempTable(rddTableName)
@@ -456,7 +348,7 @@ object VectorAutoRegressionMain extends myAPP{
 
     rawDataFrame.orderBy(col(windowIdColName)).show()
 
-    Tools.columnTypesIn(windowIdColName, rawDataFrame, true, LongType)
+    Tools.columnTypesIn(windowIdColName, rawDataFrame, true, LongType, IntegerType)
 
     val variablesColObj = pJsonParser.get("variablesColNames").getAsJsonArray
     val variablesColNames = Array.range(0, variablesColObj.size()).map {
@@ -513,37 +405,178 @@ object VectorAutoRegressionMain extends myAPP{
     println("补全之后")
     changeRdd.collect().sortBy(_._1).foreach(println)
 
-        val zeroValue: mutable.Set[(Int, Array[Double])] = scala.collection.mutable.Set.empty
-        val seqOp = (map: mutable.Set[(Int, Array[Double])], value: (Int, Array[Double])) => {
-          map += value
-          map
-        }
+    val zeroValue: mutable.Set[(Int, Array[Double])] = scala.collection.mutable.Set.empty
+    val seqOp = (map: mutable.Set[(Int, Array[Double])], value: (Int, Array[Double])) => {
+      map += value
+      map
+    }
 
-        val resultRdd = changeRdd.aggregateByKey(zeroValue)(seqOp, (m1, m2) => m1 ++ m2).mapValues {
-          set =>
-            set.toArray.sortBy(_._1)
-        }
+    val fillSeriesRdd: RDD[(Long, Map[Int, Array[Double]])] = changeRdd.aggregateByKey(zeroValue)(seqOp, (m1, m2) => m1 ++ m2).mapValues {
+      set =>
+        set.toMap
+    }
 
-//        println("-"*80)
-//
-//        resultRdd.collect().sortBy(_._1).foreach{
-//          case (windowId, features) =>
-//            println(s"$windowId, ${features.mkString(", ")}")
-//        }
+
+    // y0, y1, ..., yk-1     0, 1, ..., p => 其中每一行的逻辑如下
+    // y0 * lag(0, y0), y1 * lag(0, y0), y2 * lag(0, y0), ..., yk-1 * lag(0, y0),
+    // y0 * lag(0, y1), y1 * lag(0, y1), y2 * lag(0, y1), ..., yk-1 * lag(0, y1),
+    // ...  ...  ...
+    // y0 * lag(0, yk-1), y1 * lag(0, yk-1), y2 * lag(0, yk-1), ..., yk-1 * lag(0, yk-1),
+    // y0 * lag(1, y0), y1 * lag(1, y0), y2 * lag(1, y0), ..., yk-1 * lag(1, y0),
+    // y0 * lag(1, y1), y1 * lag(1, y1), y2 * lag(1, y1), ..., yk-1 * lag(1, y1),
+    // ...  ...  ...
+    // y0 * lag(1, yk-1), y1 * lag(1, yk-1), y2 * lag(1, yk-1), ..., yk-1 * lag(1, yk-1),
+    // ...  ...  ...
+    // ...  ...  ...
+    // y0 * lag(p, y0), y1 * lag(p, y0), y2 * lag(p, y0), ..., yk-1 * lag(p, y0),
+    // y0 * lag(p, y1), y1 * lag(p, y1), y2 * lag(p, y1), ..., yk-1 * lag(p, y1),
+    // ...  ...  ...
+    // y0 * lag(p, yk-1), y1 * lag(p, yk-1), y2 * lag(p, yk-1), ..., yk-1 * lag(p, yk-1),
+    val rddForCorr: RDD[(Long, Array[Double])] = fillSeriesRdd.mapValues {
+      mp =>
+        val values = mp(0)
+        Array.range(0, p + 1).flatMap(
+          i =>
+            mp(i).flatMap {
+              v => values.map(_ * v)
+            } // @todo: 验证一下
+        )
+    }
+
+
+    val corr = rddForCorr.values.reduce {
+      case (corr1, corr2) => corr1.zip(corr2).map {
+        case (d1, d2) => d1 + d2
+      }
+    }.map(_ / (timeT - p - 1)) // 求自相关系数
+
+    println("最终的相关系数矩阵")
+    corr.foreach(println)
+
+    val numFeatures = variablesColNames.length
+    require(corr.length == (p + 1) * numFeatures * numFeatures,
+      "最终的求出系数的长度不能够成相关系数矩阵")
+
+
+    val rho = Array.range(0, p + 1).map {
+      lag =>
+        val corrValue = corr.slice(lag * numFeatures * numFeatures, (lag + 1) * numFeatures * numFeatures)
+        (lag, new DenseMatrix[Double](numFeatures, numFeatures, corrValue))
+    }.toMap
+
+    rho.foreach(println)
+
+    /** 形成一个大的矩阵 */
+    println("----")
+    val lxx = DenseMatrix.zeros[Double](numFeatures * p, numFeatures * p)
+
+    Array.range(0, p).foreach {
+      horizonId =>
+        Array.range(0, p).foreach {
+          verticalId =>
+            val index = if(verticalId <= horizonId) horizonId - verticalId else verticalId - horizonId
+            lxx(verticalId * numFeatures until (verticalId + 1)*numFeatures,
+              horizonId * numFeatures until (horizonId + 1)*numFeatures) := rho(index)
+        }
+    }
+    println(lxx)
+
+    println("----")
+    var lxy = DenseMatrix.zeros[Double](0, numFeatures)
+    Array.range(1, p + 1).foreach {
+      index =>
+        lxy = DenseMatrix.vertcat(lxy, rho(index))
+    }
+    println(lxy)
+
+    import breeze.linalg.inv
+
+    val coefficients: DenseMatrix[Double] = try{
+      inv(lxx) * lxy
+    } catch {
+      case e: Exception => throw new Exception("在通过Yule-Walker方程估计向量自回归系数时出现异常，可能的原因是" +
+        s"输入的若干变量之间相关性非常大（例如两组变量值完全或接近完全一致），具体信息:${e.getMessage}")
+    }
+
+    println("最终系数")
+    println(coefficients)
+    val coefResult = mutable.Map.empty[Int, DenseMatrix[Double]]
+    for(i <- 0 until p) {
+      coefResult += (i -> coefficients(i * numFeatures until (i + 1)*numFeatures, ::))
+    }
+
+    println("放到map中")
+    coefResult.keys.foreach(println)
+
+
+    val (lastWindowId: Long, lastMap: Map[Int, Array[Double]]) = fillSeriesRdd.filter(_._1 == timeT - 1 - p).first()
+
+    println("lastMap:", lastMap)
+    val predictSteps = 10
+    var i = 0
+    val res = mutable.ArrayBuilder.make[(Long, Map[Int, Array[Double]])]()
+    var mp = lastMap
+    while (i < predictSteps) {
+      mp = mp - p
+      mp = mp.map {
+        case (key, value) => (key + 1, value)
+      }
+
+      println("mp的值")
+      mp.foreach {
+        case (key, value) => println(key, value)
+      }
+
+      var predictValue = new Array[Double](numFeatures)
+      for (step <- 0 until p) {
+        println(s"第$step, 次循环")
+        val mt1 = coefResult(step)
+        println("mt1:", mt1.rows, mt1.cols)
+        val v1 = new DenseVector[Double](mp(step + 1))
+        println("v1:", v1.length, v1)
+
+        val res: DenseVector[Double] = coefResult(step) * new DenseVector[Double](mp(step + 1))
+        println("res", res)
+        predictValue = res.data.zip(predictValue).map {
+          case (d1, d2) => d1 + d2
+        }
+        println("predictValue", predictValue.mkString(","))
+      }
+
+      mp += (0 -> predictValue)
+      res += (lastWindowId + 1 + i -> mp)
+
+      i += 1
+    }
+
+    println("最终结果")
+
+
+    val rdd4DF: RDD[Row] = fillSeriesRdd.union(sparkContext.makeRDD(res.result(), 1)).map {
+      case (windowId, mAp) => Row.fromSeq(windowId +: mAp(0))
+    }
+
+    val newDataFrame = sQLContext.createDataFrame(rdd4DF, StructType(
+      StructField(windowIdColName, LongType) +: variablesColNames.map(name => StructField(name, DoubleType))
+    )).orderBy(col(windowIdColName))
+
+    newDataFrame.show(200)
 
 
   }
 
 
   override def run(): Unit = {
-    //    val values = Array("y1", "y2", "y3")
-    //
-    //    val res  = Array.range(0, 5 + 1).flatMap(i => values.flatMap(dim1 => values.map(name => name + " * " + s"lag($dim1, $i)"))).mkString(", ")
-    //    println(res)
+//        val values = Array("y1", "y2", "y3")
+//
+//        val res  = Array.range(0, 5 + 1).flatMap(i => values.flatMap(dim1 => values.map(name => name + " * " + s"lag($dim1, $i)"))).mkString(", ")
+//        println(res)
 
 //    testTimeSeriesWarping()
 
-    testVAR()
+        testVAR()
+
+//    println(DenseMatrix.tabulate(3, 3){case (i, j) => i.toDouble + j} * new DenseVector[Double](Array(1.0, 2, 3)))
 
 
   }
