@@ -2,6 +2,8 @@ package com.self.core.learningKMeans
 
 import com.self.core.baseApp.myAPP
 import org.apache.spark.mllib.linalg.VectorUDT
+import org.apache.spark.sql.DataFrame
+import org.apache.spark.sql.types.StringType
 
 object learningKMeansMain extends myAPP {
   def createData() = {
@@ -81,6 +83,12 @@ object learningKMeansMain extends myAPP {
     重复10次训练，        花费40952640毫秒
     每次同时训练10个模型， 花费6722452毫秒
      */
+
+
+
+
+
+
 
 
 
