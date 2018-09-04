@@ -24,7 +24,7 @@ object DataSimulator2 {
 
     // 获取指定文件总的行数
 //    val filename = args(0) // 文件路径
-    val filename = "F:myStudio/people.txt"
+    val filename = "F://myStudio/people.txt"
     val lines = Source.fromFile(filename).getLines.toList // 文件内容，按行存储
     val filerow = lines.length // 行数
 

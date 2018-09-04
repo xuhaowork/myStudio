@@ -428,6 +428,9 @@ object learning extends myAPP{
 
     println(func(""))
 
+    import org.apache.spark.mllib.clustering.KMeans
+
+
 
     //  val ifNewSchema = inputDf.schema
     //
