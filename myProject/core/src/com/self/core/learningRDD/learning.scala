@@ -1,17 +1,20 @@
 package com.self.core.learningRDD
 
-import com.google.gson.{Gson, JsonParser}
 import com.self.core.baseApp.myAPP
-import org.apache.spark.{Partitioner, SparkException}
-import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.DataFrame
-import org.apache.spark.sql.functions.col
-import org.apache.spark.sql.types.StructType
 
-import scala.collection.mutable
+object learning extends myAPP {
+  def test() = {
 
-object learning extends myAPP{
+  }
+
+
   override def run(): Unit = {
+
+    test()
+
+
+
+
     //    /** 模拟数据 */
     //    val rd = new java.util.Random(123L)
     //
@@ -363,73 +366,72 @@ object learning extends myAPP{
     //    time2:156097617
     //    最终结论：交叠分区要比join快，但交叠分区可能的分区值是不同的，结果居然不同，这个问题还有待解决。
 
-    import org.apache.spark.sql.functions
-
-
-    import com.google.gson.{Gson, JsonParser}
-    import org.apache.spark.sql.DataFrame
-    import org.apache.spark.sql.functions.{col, udf}
-    import org.apache.spark.sql.types.StringType
-    import org.apache.spark.sql.NullableFunctions
-
-    val jsonparam = """{"RERUNNING":{"nodeName":"通用格式转换_1","preNodes":[{"checked":true,"id":"文本目录数据源新版升级_1_wvzrwHW4"}],"rerun":"false"},"changeInforObj":{"changeInfor":".","value":"false"},"invalidChars":"\"","tableName":"文本目录数据源新版升级_1_wvzrwHW4"}"""
-    println(jsonparam)
-    val gson = new Gson()
-    val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
-    val tableName = p.get("tableName")
-
-
-    val parser = new JsonParser()
-    val pJsonParser = parser.parse(jsonparam).getAsJsonObject
-
-
-    val changeInforFormat = pJsonParser.getAsJsonObject("changeInforObj").get("value").getAsString
-    val invalidChars = p.get("invalidChars")
-    var changeInfor = ""
-    if (changeInforFormat == "false") {
-      changeInfor = pJsonParser.getAsJsonObject("changeInforObj").get("changeInfor").getAsString //请输入替代的字符串
-    }
-
-
-    val regexArray = invalidChars.split(";")
-
-    val z1 = outputrdd
-    var inputDf: DataFrame =null
-
-    var i = 1
-    val schema: StructType = null
-
-    val specialStrArr: Array[String] = Array("+", ".", "*", "$", "^", "?", "[", "{", "(", ")", "|", "\\", ".")
-    val func = (str: String) => {
-      val strTemp1 = if (str == null) "" else str
-
-      val newStrTemp = if (changeInfor == null) "" else changeInfor
-      val strTemp = if (i == 1) {
-        val head = strTemp1.getBytes()
-        if (head(0) == (-17) && head(1) == (-69) && head(2) == (-65)) head.drop(3).map(_.toChar).mkString else strTemp1
-      } else strTemp1
-      i = i + 1
-
-      val headStr = util.Try(str.head.toString).getOrElse("")
-      val lastStr = util.Try(str.last.toString).getOrElse("")
-      val tail = if(str.isEmpty) "" else if (specialStrArr.contains(lastStr)) s"\\${str.last}" else lastStr //${} 字符串占位符
-      val head =if(str.isEmpty) "" else if (specialStrArr.contains(headStr)) s"\\${str.head}" else headStr
-      val result = if (regexArray.contains(headStr) && regexArray.contains(lastStr))
-        strTemp.replaceFirst(head, newStrTemp).reverse.replaceFirst(tail, newStrTemp.reverse).reverse
-      else if (regexArray.contains(headStr) && !regexArray.contains(lastStr))
-        strTemp.replaceFirst(head, newStrTemp)
-      else if (regexArray.contains(lastStr) && !regexArray.contains(headStr))
-        strTemp.reverse.replaceFirst(tail, newStrTemp.reverse).reverse
-      else strTemp
-      result.trim
-    }
-
-    val uFunc = NullableFunctions.udf(func)
-
-    println(func(""))
-
-    import org.apache.spark.mllib.clustering.KMeans
-
+    //    import org.apache.spark.sql.functions
+    //
+    //
+    //    import com.google.gson.{Gson, JsonParser}
+    //    import org.apache.spark.sql.DataFrame
+    //    import org.apache.spark.sql.functions.{col, udf}
+    //    import org.apache.spark.sql.types.StringType
+    //    import org.apache.spark.sql.NullableFunctions
+    //
+    //    val jsonparam = """{"RERUNNING":{"nodeName":"通用格式转换_1","preNodes":[{"checked":true,"id":"文本目录数据源新版升级_1_wvzrwHW4"}],"rerun":"false"},"changeInforObj":{"changeInfor":".","value":"false"},"invalidChars":"\"","tableName":"文本目录数据源新版升级_1_wvzrwHW4"}"""
+    //    println(jsonparam)
+    //    val gson = new Gson()
+    //    val p: java.util.Map[String, String] = gson.fromJson(jsonparam, classOf[java.util.Map[String, String]])
+    //    val tableName = p.get("tableName")
+    //
+    //
+    //    val parser = new JsonParser()
+    //    val pJsonParser = parser.parse(jsonparam).getAsJsonObject
+    //
+    //
+    //    val changeInforFormat = pJsonParser.getAsJsonObject("changeInforObj").get("value").getAsString
+    //    val invalidChars = p.get("invalidChars")
+    //    var changeInfor = ""
+    //    if (changeInforFormat == "false") {
+    //      changeInfor = pJsonParser.getAsJsonObject("changeInforObj").get("changeInfor").getAsString //请输入替代的字符串
+    //    }
+    //
+    //
+    //    val regexArray = invalidChars.split(";")
+    //
+    //    val z1 = outputrdd
+    //    var inputDf: DataFrame =null
+    //
+    //    var i = 1
+    //    val schema: StructType = null
+    //
+    //    val specialStrArr: Array[String] = Array("+", ".", "*", "$", "^", "?", "[", "{", "(", ")", "|", "\\", ".")
+    //    val func = (str: String) => {
+    //      val strTemp1 = if (str == null) "" else str
+    //
+    //      val newStrTemp = if (changeInfor == null) "" else changeInfor
+    //      val strTemp = if (i == 1) {
+    //        val head = strTemp1.getBytes()
+    //        if (head(0) == (-17) && head(1) == (-69) && head(2) == (-65)) head.drop(3).map(_.toChar).mkString else strTemp1
+    //      } else strTemp1
+    //      i = i + 1
+    //
+    //      val headStr = util.Try(str.head.toString).getOrElse("")
+    //      val lastStr = util.Try(str.last.toString).getOrElse("")
+    //      val tail = if(str.isEmpty) "" else if (specialStrArr.contains(lastStr)) s"\\${str.last}" else lastStr //${} 字符串占位符
+    //      val head =if(str.isEmpty) "" else if (specialStrArr.contains(headStr)) s"\\${str.head}" else headStr
+    //      val result = if (regexArray.contains(headStr) && regexArray.contains(lastStr))
+    //        strTemp.replaceFirst(head, newStrTemp).reverse.replaceFirst(tail, newStrTemp.reverse).reverse
+    //      else if (regexArray.contains(headStr) && !regexArray.contains(lastStr))
+    //        strTemp.replaceFirst(head, newStrTemp)
+    //      else if (regexArray.contains(lastStr) && !regexArray.contains(headStr))
+    //        strTemp.reverse.replaceFirst(tail, newStrTemp.reverse).reverse
+    //      else strTemp
+    //      result.trim
+    //    }
+    //
+    //    val uFunc = NullableFunctions.udf(func)
+    //
+    //    println(func(""))
+    //
+    //    import org.apache.spark.mllib.clustering.KMeans
 
 
     //  val ifNewSchema = inputDf.schema
