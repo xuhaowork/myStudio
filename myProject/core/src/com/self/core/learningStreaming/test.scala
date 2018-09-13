@@ -2,7 +2,10 @@ package com.self.core.learningStreaming
 
 import java.io.PrintWriter
 import java.net.ServerSocket
+
 import com.self.core.baseApp.myAPP
+import org.apache.spark.rdd.RDD
+
 import scala.io.Source
 
 object test extends myAPP{
@@ -12,6 +15,7 @@ object test extends myAPP{
       val rdm = new Random
       rdm.nextInt(length)
     }
+
 
     val filename = "F://myStudio/people.txt"
     val lines = Source.fromFile(filename).getLines.toList // 文件内容，按行存储

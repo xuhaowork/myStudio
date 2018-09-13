@@ -5,6 +5,14 @@ import com.self.core.baseApp.myAPP
 object learning extends myAPP {
   def test() = {
 
+    import org.apache.spark.rdd.RDD
+
+    val z1 = outputrdd
+    val rdd = z1.get("流输出_1_ZyqIgqXY_rdd").asInstanceOf[RDD[String]]
+    val u = rdd.collect()
+//      .foreach(println)
+
+
   }
 
 
