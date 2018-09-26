@@ -8,13 +8,11 @@ import org.apache.spark.sql.SQLContext
 
 /**
   * editor: xuhao
-  * date: 2018-03-27 08:30:00
+  * date: 2018-09-26 08:30:00
   */
 
 /**
   * 特征提取模块
-  * ----
-  * 一、算子使用流程中的数据转换过程如下：
   *
   * @see input 在该类别之前将多个表做成长的事件表并去掉无效值，作为[[FeatureAssembler]]的输入，注意这里不在去除无效值
   *      ----
@@ -26,28 +24,6 @@ import org.apache.spark.sql.SQLContext
   *               1)keyString/feature/category的列名
   *               2)
   * @define train 训练事件表，获得特征集成的模型[[FeatureAssemblerModel]]
-  *               数据处理过程为：
-  *               1)输入Array[表, keyString列名, 预过滤SQL]
-  *               2)输入一个列名（稀疏）主要用于基于给定列名的特征提取，该功能用于已有模型用于预测新的数据.
-  *               ---
-  *               3)提供一个频率非连续线性变换
-  *               ---
-  *               4)输出RDD[keyString, Vector]用于样本的训练和预测.
-  *               5)输出列名,可用于直接的预测.
-  *               该部分主要用于：新数据 => 合并(特征提取) => 基于持久化聚类模型的预测
-  * @define save  模型保存
-  * @see load  模型读取
-  *
-  *      二、[[FeatureAssembler]]的train算法 --目的是获得最常用的[[FeatureAssembler.maxFeatureNum]]个特征：
-  *      1)将所有的feature和category结合编码，认为是一个keyString所经过的一个值（或者认为是轨迹点）
-  *
-  *      2)取最长出现的[[FeatureAssembler.maxFeatureNum]]个特征，作为稀疏特征，存入模型
-  *
-  *      三、predict算法
-  * @todo: 由于特征求完后不需要再使用特征名了，因此可以使用hash词频统计，此时特征可以变为Long
-  */
-
-/**
   * @param maxFeatureNum 最大特征数，防止栈溢出
   * @param tfIdf         是否进行tf-idf转换
   */
@@ -57,7 +33,7 @@ class FeatureAssembler(
                         val min_docFreq: Double = 5.0
                       ) {
   /** 默认参数和一些参数设定函数 */
-  def this() = this(10000L, 0.0, true, true)
+  def this() = this(10000L, true, 5.0)
 
   /**
     * 长表的一些默认列名
@@ -69,7 +45,7 @@ class FeatureAssembler(
   /**
     * set和get方法
     */
-  def setkeyStringCol(keyStringCol: String): this.type = {
+  def setKeyStringCol(keyStringCol: String): this.type = {
     this.keyStringCol = keyStringCol
     this
   }
@@ -134,7 +110,16 @@ class FeatureAssembler(
 
 }
 
-
+/**
+  * [[com.self.core.featureAssemble.FeatureAssembler]]的train算法 --目的是获得最常用的[[FeatureAssembler.maxFeatureNum]]个特征：
+  * 1)将所有的feature和category结合编码，认为是一个keyString所经过的一个值（或者认为是轨迹点）
+  *
+  * 2)取最长出现的[[com.self.core.featureAssemble.FeatureAssembler.maxFeatureNum]]个特征，作为稀疏特征，存入模型
+  *
+  * @define load    模型加载
+  * @define save    模型保存
+  * @define predict 预测模型
+  */
 class FeatureAssemblerModel(
                              val sparseFeatures: scala.collection.Map[String, (Double, Int)],
                              val alpha: Double = 0.0
@@ -200,7 +185,7 @@ class FeatureAssemblerModel(
     }.aggregateByKey(zeroValue)(
       seqOp,
       combOp
-    ).mapValues(sigRectifyVector(_, alpha))
+    ).mapValues(utils.sigRectifyVector(_, alpha))
 
   }
 
