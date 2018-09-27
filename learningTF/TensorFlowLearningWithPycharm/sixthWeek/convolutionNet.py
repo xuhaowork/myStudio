@@ -54,7 +54,7 @@ def max_pool_2x2(x):
     # ksize [1,x,y,1]
     return tf.nn.max_pool(x, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
 
-
+# logs 存储的根目录
 DIR = "d://tensorboardLogDir/sixWeek/"
 
 # 命名空间
