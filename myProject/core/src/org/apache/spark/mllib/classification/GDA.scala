@@ -114,7 +114,7 @@ class GDAModel(val fi: Double, val mu0: Vector, val mu1: Vector, val sigma: Dens
     axpy(-1.0, mu0, testDataToMu0)
     axpy(-1.0, mu1, testDataToMu1)
 
-    val invSigmaBreeze: BDM[Double] = inv.canInvUsingLU.apply(sigma.toBreeze.toDenseMatrix)
+    val invSigmaBreeze: BDM[Double] = inv.apply(sigma.toBreeze.toDenseMatrix)
     val invSigma = new DenseMatrix(invSigmaBreeze.rows, invSigmaBreeze.cols,
       invSigmaBreeze.data)
 
