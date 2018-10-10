@@ -1,8 +1,12 @@
 package com.self.core.trailCorner
 
+import java.sql.Date
+import java.text.SimpleDateFormat
+
 import com.self.core.baseApp.myAPP
 import com.self.core.trailCorner.models.{Point, PointDiffStat}
 
+import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
 /**
@@ -166,6 +170,17 @@ object hoverCorner extends myAPP {
     p.ylabel = "纬度"
   }
 
+  /**
+    * 轨迹预处理
+    * ----
+    * 输入数据: time, (latitude, longitude)
+    * ----
+    * 算法:
+    * 按时间排序;
+    * 每个时间保留一个有效数据
+    *
+    */
+
 
   /**
     * 轨迹点差分统计
@@ -179,7 +194,7 @@ object hoverCorner extends myAPP {
     * @param trailData 预处理后的轨迹数据
     * @return 轨迹点差分统计特性 [时间、速度、加速度、转角、时间差]
     */
-  def trailStat(trailData: Array[Point]): Array[PointDiffStat] = {
+  def trailDiffStat(trailData: Array[Point]): Array[PointDiffStat] = {
     trailData.sliding(3).map {
       // 领先2阶, 领先1阶, 当前
       case Array(p2, p1, p) =>
@@ -214,9 +229,9 @@ object hoverCorner extends myAPP {
     * step3. 此时剩余记录为运动数据, 根据 [最大无记录时间] + [停留] 分离出多条轨迹.
     *
     * @param trailData       异常点过滤后的数据
-    * @param minMovingSpeed  最小运动速度: 如果低于该速度认为目标是静止的: 不同交通工具是不同的
-    * @param maxStaticPeriod 最大静止时长: 如果静止时间过长则认为目标的这次运动已经结束
-    * @param maxNoRecordTime 最大非运动时间: 如果超出这段时间这认为超出了观测, 此时轨迹自然分离
+    * @param minMovingSpeed  最小运动速度: 如果低于该速度认为目标是静止的: 不同交通工具是不同的, 单位: m/s
+    * @param maxStaticPeriod 最大静止时长: 如果静止时间过长则认为目标的这次运动已经结束, 单位: 毫秒
+    * @param maxNoRecordTime 最大非运动时间: 如果超出这段时间这认为超出了观测, 此时轨迹自然分离, 单位: 毫秒
     * @return 一条或多条轨迹 [轨迹id, 轨迹]
     */
   def trailDisperse(
@@ -225,17 +240,27 @@ object hoverCorner extends myAPP {
                      maxStaticPeriod: Long,
                      maxNoRecordTime: Long
                    ): Array[(Int, ArrayBuffer[PointDiffStat])] = {
-    val res = scala.collection.mutable.ArrayBuilder.make[(Int, ArrayBuffer[PointDiffStat])]()
+    /** 录入数据用的结果 */
+    val res: mutable.ArrayBuilder[(Int, ArrayBuffer[PointDiffStat])] =
+      scala.collection.mutable.ArrayBuilder.make[(Int, ArrayBuffer[PointDiffStat])]()
 
-    /** 上一条移动轨迹点时间 */
-    var lastMovingPointTime = Long.MinValue
-    var lastRecordPointTime = Long.MinValue
-    var gate = false
-    var firstPoint: PointDiffStat = null
-    /** 存储每条轨迹的缓存 */
-    var arrayBuffer = ArrayBuffer.empty[PointDiffStat]
     /** 轨迹的id */
     var trailId = 0
+
+    /** 上一条移动轨迹点时间和上一次有记录的时间 --除以2因为是要被减的, 只要不是公元前几万年不会越界 */
+    var lastMovingPointTime = Long.MinValue >> 1
+    var lastRecordPointTime = Long.MinValue >> 1
+
+    /** 存储每条轨迹的缓存 */
+    var arrayBuffer = ArrayBuffer.empty[PointDiffStat]
+
+    /** 数据进入缓存[[arrayBuffer]]的状态监控, 当有数据进入时gate是true, 当arrayBuffer中有数据时才可以录入 */
+    var gate = false
+
+    /** 判定上一条轨迹是否结束  --初值[[lastMovingPointTime]]等变量是[[Long.MinValue]], 因此初值是true */
+    val trailFinish = (pointDiffStat: PointDiffStat) =>
+      (pointDiffStat.time - lastMovingPointTime) >= maxStaticPeriod ||
+        (pointDiffStat.time - lastRecordPointTime) >= maxNoRecordTime
 
     /**
       * 算法:
@@ -259,52 +284,42 @@ object hoverCorner extends myAPP {
       * 3)如果是轨迹开启状态:
       * 每次录入结束后, 门关闭。
       * 如果[[gate]]开启则录入数据, 关闭门;
-      * 如果该点是移动状态, 则将记录记录进[[firstPoint]]并将门开启;
       *
-      * 如果出现一条和上一条记录之间的时差小于等于[[maxNoRecordTime]]和[[maxStaticPeriod]]的时, gate打开, 并对统计结果进行累加赋值操作
-      * 3)如果下一条记录的时间差大于等于anonymousThreshold且门已经打开, 此时这条记录结束，如果记录数超过有效阈值就结算一下，
-      * 将统计结果存入并清零，将门关闭。
-      * 4)当全部进行完，如果门还开着, 清算一下当前记录的结果，将结果存入
-      * 最终返回: [记录id, 统计结果]
       */
     trailData.foreach {
       pointDiffStat =>
+        println("-" * 80)
+        println("pointDiff", pointDiffStat)
+        println("旧轨迹结束为", trailFinish(pointDiffStat))
         // 轨迹开启状态
-        if ((pointDiffStat.time - lastMovingPointTime) >= maxStaticPeriod ||
-          (pointDiffStat.time - lastRecordPointTime) >= maxNoRecordTime) {
+        if (trailFinish(pointDiffStat)) {
           // 录入数据并清空缓存
           if (gate) {
             res += Tuple2(trailId, arrayBuffer)
+            println("录入数据")
 
             trailId += 1
-            arrayBuffer.clear()
+            arrayBuffer = ArrayBuffer.empty[PointDiffStat]
             gate = false
           }
 
           lastRecordPointTime = pointDiffStat.time
           if (pointDiffStat.speed >= minMovingSpeed) {
             lastMovingPointTime = pointDiffStat.time
-            firstPoint = pointDiffStat
+            arrayBuffer += pointDiffStat
             gate = true
           }
         } else {
-          // 更新下该条记录所应有的更新, 如果
           lastRecordPointTime = pointDiffStat.time
           // 有效数据, 往缓存中记录
           if (pointDiffStat.speed >= minMovingSpeed) {
-            lastMovingPointTime = pointDiffStat.time
-            // 如果上一条非空(出现于轨迹开启状态时的第一条数据是合法数据时)时, 把第一条也录入了
-            if (firstPoint != null) {
-              arrayBuffer += firstPoint
-              arrayBuffer += pointDiffStat
-              firstPoint = null
-              gate = true
-            } else {
-              arrayBuffer += pointDiffStat
-              gate = true
-            }
-          }
+            println("往缓存中记录数据")
 
+            lastMovingPointTime = pointDiffStat.time
+
+            arrayBuffer += pointDiffStat
+            gate = true
+          }
         }
 
     }
@@ -314,7 +329,7 @@ object hoverCorner extends myAPP {
       res += Tuple2(trailId, arrayBuffer)
 
       trailId += 1
-      arrayBuffer.clear()
+      arrayBuffer = ArrayBuffer.empty[PointDiffStat]
       gate = false
     }
 
@@ -331,21 +346,30 @@ object hoverCorner extends myAPP {
     //    if(trailData.length <= 5)
 
     /** 轨迹点差分统计 */
-    val statData: Array[PointDiffStat] = trailStat(trailData)
+    val statData: Array[PointDiffStat] = trailDiffStat(trailData)
+    println("差分统计")
+    statData.take(10).foreach(println)
 
     /** 异常点过滤 */
-
+    val filterData = trailAbnormalFilter(statData)
 
     /** 轨迹分离 */
-    val minMovingSpeed: Double = 0.1
-    val maxStaticPeriod: Long = 30 * 60 * 60 * 1000
-    val maxNoRecordTime: Long = 30 * 60 * 60 * 1000
-    trailDisperse(statData, minMovingSpeed, maxStaticPeriod, maxNoRecordTime)
+    val minMovingSpeed: Double = 5
+    val maxStaticPeriod: Long = 30 * 60 * 1000
+    val maxNoRecordTime: Long = 30 * 60 * 1000
+    val trails = trailDisperse(
+      filterData,
+      minMovingSpeed,
+      maxStaticPeriod,
+      maxNoRecordTime
+    )
 
-    /** step1. 将轨迹根据最大非运动时间拆分为多条轨迹 */
-
-
-    /** 小于等于5个点无法形成三个转角 --默认转三次才试一次合理的转角 */
+    println("分离轨迹的结果")
+    trails.foreach {
+      case (index, trail) =>
+        println(s"------第${index}条轨迹------")
+        trail.foreach(println)
+    }
 
 
   }
@@ -393,5 +417,8 @@ object hoverCorner extends myAPP {
 
 
     test(trailData)
+
+
+
   }
 }

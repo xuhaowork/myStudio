@@ -37,7 +37,7 @@ case class Shift(from: Point, to: Point) {
     Math.asin(Math.sin((to.longitude - from.longitude) * Math.PI / 180)) * 180 / Math.PI
   val shiftOnLatitudes: Double = to.latitude - from.latitude
 
-  /** 时间差 --要求当前轨迹点要晚于出发的轨迹点 */
+  /** 时间差 --要求当前轨迹点要晚于出发的轨迹点, 单位是毫秒 */
   lazy val timeDiff: Long = {
     require(to.time - from.time > 0, s"出现逻辑异常: 从${from}到${to}的移动中, 后面点的时间'${to.time}'比前面点的时间'${from.time}'早")
     to.time - from.time
@@ -63,7 +63,7 @@ case class Shift(from: Point, to: Point) {
     * ----
     * 单位是m/s
     */
-  lazy val speed: Double = distance / timeDiff
+  lazy val speed: Double = distance * 1000000 / timeDiff
 
   /**
     * 位移平均加速度
