@@ -1,10 +1,10 @@
 package com.self.core.clique
 
 import com.self.core.baseApp.myAPP
-import com.self.core.clique.models.{FreqItem, MinMaxStandard}
+import com.self.core.clique.models.{CliqueUtils, FreqItem, MinMaxStandard}
 import org.apache.spark.rdd.RDD
 
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, Map => mutableMap}
 
 /** CLIQUE聚类算法 */
 object Clique extends myAPP {
@@ -192,8 +192,8 @@ object Clique extends myAPP {
     require(scala.math.pow(cellsNum, featuresNum) <= (1 << 30), s"您选择拆分单元数'$cellsNum'过大, " +
       s"这样会拆分出接近'$splitCellsNum'个单元, 超出了目前算子的处理能力, 请降低数据维度或调小拆分单元数")
 
-    val minDenseThreshold = 3
-    require(minDenseThreshold > 0, "密集单元数至少应大于0, 否则全部数据都作为密集单元会出现性能问题")
+    val minDenseThreshold = 2
+    require(minDenseThreshold > 0, "最小密集单元数至少应大于0, 否则全部数单元格都作为密集单元此时没有意义，另外注意如果最小密集单元数如果过小可能会导致性能问题")
 
     /** step1. min-max归一化 */
     val standardCol = "standardCol"
@@ -232,6 +232,8 @@ object Clique extends myAPP {
       *       2)在spark中每次filter其实都是向最初的RDD或最近Cache的RDD拿数据, 如果data仅在递归开始前cache一次,
       *       那在第t次依然需要重复前面t-1次的filter过程, 如果每一步cache, 数据较大时性能更成问题.
       *       3)因此对于分布式来说全部分组统计求频率反而不是大问题, 每一步filter + 分组统计, 才是问题
+      *       4)基于以上问题, 剪枝也不需要了, 在CLIQUE算法中剪枝是为了尽量减少自下向上的单元格, 但这是一个近似过程,
+      *       会导致部分有效的单元格被减掉, 被后续的一些改进算法所抛弃, 由于spark频次统计很在行, 因此这里抛弃剪枝.
       */
     var frequencyRdd: RDD[(Seq[Int], (Long, ArrayBuffer[FreqItem]))] =
       splitCellsDF.groupBy("splitCells").agg(count(lit(1)).as("frequency")).rdd.map {
@@ -299,11 +301,130 @@ object Clique extends myAPP {
 
     denseCellsRDD.foreach(println)
 
+    val denseCells: Array[Seq[Int]] = try {
+      denseCellsRDD.keys.collect()
+    } catch {
+      case e: Exception => throw new Exception("将稠密单元格本地化时失败, 有可能是稠密单元数过多导致传输过程中超过了" +
+        "akkaFrameSize, 如果是此情况, 您可以调大最小密集单元数来控制该问题或调大资源配置中的akkaFrameSize. " +
+        s"具体异常为: ${e.getMessage}")
+    }
+
+    /** 基于深度优先的遍历 */
+    CliqueUtils.dfs(denseCells: Array[Seq[Int]])
+
+
   }
 
   override def run(): Unit = {
 
-    test()
+    //    test()
+
+
+    //    val memoryMap = mutableMap.empty[Seq[Int], Long]
+    //    memoryMap += (Seq(0) -> 1L)
+    //    memoryMap += (Seq(1) -> 2L)
+    //    memoryMap += (Seq(0) -> 3L)
+    //
+    //    println(memoryMap)
+
+    /** 稠密单元 */
+    val cellsData =
+      Array(
+        Seq(0, 2),
+        Seq(1, 2),
+        Seq(1, 3),
+        Seq(2, 1),
+        Seq(2, 2),
+        Seq(2, 3),
+        Seq(4, 2),
+        Seq(4, 3),
+        Seq(5, 2),
+        Seq(5, 3),
+        Seq(6, 1),
+        Seq(6, 2),
+        Seq(6, 3),
+        Seq(7, 1),
+        Seq(7, 2)
+      )
+
+    CliqueUtils.hotPlot(cellsData, theme = "原数据的热力图")
+
+    val res = CliqueUtils.dfs(cellsData: Array[Seq[Int]])
+    res.foreach(println)
+
+    CliqueUtils.hotPlot(res(0)._2, theme = "连通图1的热力图")
+
+    CliqueUtils.hotPlot(res(1)._2, theme = "连通图2的热力图")
+
+    val (subGraph1, subGraph): (Int, ArrayBuffer[Seq[Int]]) = res(0)
+
+
+    subGraph.foreach {
+      node =>
+        var candidate4node = subGraph
+        for (i <- node.indices) {
+          candidate4node = candidate4node.filter(other => other.drop(1) == node.drop(1))
+        }
+    }
+
+    // 未被遍历的node
+    var candidateNodes = subGraph
+    while(candidateNodes.nonEmpty) {
+      // 任选一个节点
+      val node = candidateNodes.head
+
+      var candidate4node = subGraph
+      // 依次遍历所有的维度, 维度按次序递增, 找到对于该节点最大的覆盖
+      for (dims <- node.indices) {
+        candidate4node = candidate4node.filter(other => other.drop(dims) == node.drop(dims))
+        val uu = candidate4node.map(each => each.slice(dims, dims + 1).head) // 有序的
+        var start = node.slice(dims, dims + 1).head
+        val index = uu.indexOf(start)
+        var end = node.slice(dims, dims + 1)
+        var flag = true
+        // 往两个方向各自走, 走到两个方向都遇到坑为止(非连续)
+        var u = 0
+        while(flag) {
+          if(index - u >= 0) {
+            val left = uu(index - u)
+            if(start - left == 1){
+              start -= 1
+            } else {
+              flag = false
+            }
+          } else {
+            flag = false
+          }
+          u += 1
+        }
+
+        flag = true
+        u = 0
+        while(flag) {
+          if(index + u < uu.length) {
+            val right = uu(index + u)
+            if(right - end == 1){
+              start -= 1
+            } else {
+              flag = false
+            }
+          } else {
+            flag = false
+          }
+          u += 1
+        }
+
+
+      }
+
+
+
+    }
+
+
+
+
+
 
 
   }
