@@ -16,7 +16,9 @@ object breezeViz extends myAPP {
     val x = linspace(0.0, 1.0)
 
     p += plot(x, x :^ 2.0)
-    p += plot(x, x :^ 3.0, '.')
+    p += plot(x, x :^ 3.0, '.', name = "scatter")
+    p.title = "scatters"
+    p.panel
     p.xlabel = "x axis"
     p.ylabel = "y axis"
 ////    f.saveas("d:\\lines.png")

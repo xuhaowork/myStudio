@@ -206,7 +206,8 @@ object hoverCorner extends myAPP {
         val accelerateVelocity = shift1.accelerateVelocityTo(shift)
         // 转角 --领先1阶的速度方向到当前速度方向的转角: 范围是[-Pi, Pi]
         val corner = shift1.cornerTo(shift)
-        PointDiffStat(p.time, speed, accelerateVelocity, corner, shift.timeDiff)
+
+        PointDiffStat(p.time, speed, accelerateVelocity, corner, shift.timeDiff, shift.to)
     }.toArray
   }
 
@@ -217,7 +218,6 @@ object hoverCorner extends myAPP {
     * @return 过滤异常点后的数据
     */
   def trailAbnormalFilter(trailData: Array[PointDiffStat]): Array[PointDiffStat] = trailData
-
 
   /**
     * 轨迹分离
@@ -366,12 +366,72 @@ object hoverCorner extends myAPP {
 
     println("分离轨迹的结果")
     trails.foreach {
-      case (index, trail) =>
+      case (index, trail: ArrayBuffer[PointDiffStat]) =>
         println(s"------第${index}条轨迹------")
         trail.foreach(println)
     }
 
+    val trail = trails(0)._2
+    val minHoverCorner: Double = scala.math.Pi * 1 / 2
+    val minHoverAvgAngularVelocity = minHoverCorner / (15 * 60)
+    val hoverTrail = trailFind(trail, minHoverCorner, minHoverAvgAngularVelocity)
 
+    plotTheTrace(hoverTrail.map(_.point).toArray, labels = (_: Int) => "a")
+  }
+
+
+  /**
+    * 发现每条轨迹的盘旋状态
+    * ----
+    * 盘旋定义
+    * 在较短时间内轨迹形成较大的转角 --从[转角，平均速度的角度看]: 转角超过一定范围，且平均转角速度大于等于某个阈值。
+    * 即目标的轨迹形成超过盘旋应有的最小转角, 且这段轨迹的平均转角速度超过最小转角速度[[]]
+    *
+    * @param trail 轨迹, 默认按时间绝对单调有序排列
+    *              盘旋最小转角 --单位: rad, 一般意义上盘旋应该至少为Pi, 否则就只是转完了.
+    *              盘旋最小平均角速度 --单位: rad/s, 可以利用盘旋最小转角/最大转一圈用的时间(单位是秒)
+    */
+  def trailFind(
+                 trail: ArrayBuffer[PointDiffStat],
+                 minHoverCorner: Double,
+                 minHoverAvgAngularVelocity: Double
+               ): ArrayBuffer[PointDiffStat] = {
+    val cumulativeDistribution = trail.map { point => (point.time, point.corner) }.scanLeft((0L, 0.0, -1)) {
+      case ((_, resCorner, resIndex), (time, corner)) =>
+        (time, resCorner + corner, resIndex + 1)
+    }.tail
+
+    /** 识别所有的转弯点 --可以包括一些非转弯点 */
+    var i = 0
+    var hoverIndex = Set.empty[Int]
+    val hoverRes = ArrayBuffer.empty[PointDiffStat]
+    while (i < cumulativeDistribution.length) {
+      val (startTime, startIndex) = (cumulativeDistribution(i)._1,
+        cumulativeDistribution(i)._3)
+      val startCorner = if (i == 0) 0.0 else cumulativeDistribution(i - 1)._2
+      val avgSeries = cumulativeDistribution.drop(i).filter {
+        case (time, corner, _) =>
+          (time - startTime) / 1000 * minHoverAvgAngularVelocity <= scala.math.abs(corner - startCorner)
+      }
+      if (avgSeries.nonEmpty) {
+        val (_, rightHover, rightIndex) = avgSeries.maxBy(_._2)
+        val (_, leftHover, leftIndex) = avgSeries.minBy(_._2)
+        val hover = scala.math.max(scala.math.abs(leftHover - startCorner), scala.math.abs(rightHover - startCorner))
+
+        if (hover > minHoverCorner) {
+          Range(startIndex, scala.math.max(leftIndex, rightIndex) + 1).foreach {
+            index =>
+              if (!hoverIndex(index)) {
+                hoverIndex += index
+                hoverRes += trail(index)
+              }
+          }
+        }
+      }
+      i += 1
+    }
+
+    hoverRes
   }
 
 
@@ -417,7 +477,6 @@ object hoverCorner extends myAPP {
 
 
     test(trailData)
-
 
 
   }

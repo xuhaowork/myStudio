@@ -380,7 +380,7 @@ object Clique extends myAPP {
         val uu = candidate4node.map(each => each.slice(dims, dims + 1).head) // 有序的
         var start = node.slice(dims, dims + 1).head
         val index = uu.indexOf(start)
-        var end = node.slice(dims, dims + 1)
+        var end = node.apply(dims)
         var flag = true
         // 往两个方向各自走, 走到两个方向都遇到坑为止(非连续)
         var u = 0

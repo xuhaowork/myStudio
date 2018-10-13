@@ -46,7 +46,7 @@ case class Shift(from: Point, to: Point) {
   /**
     * 轨迹点的球面距离
     * ----
-    * 这里球面距离是指在地球模型表面两点的最近距离, 单位是千米
+    * 这里球面距离是指在地球模型表面两点的最近球面距离, 单位是千米
     */
   lazy val distance: Double = {
     val aa = Math.sin(shiftOnLatitudes * Math.PI / 360)
@@ -91,7 +91,7 @@ case class Shift(from: Point, to: Point) {
     * 最终转角计算公式: acos { v1 * v2 / sqrt(||v1|| * ||v2||) }  *  signum{ v1_x * v2_y - v2_x * v1_y }
     *
     * @param to 下一个位移
-    * @return 转角
+    * @return 转角, 弧度
     */
   def cornerTo(to: Shift): Double = {
     require(to.time > this.time, "在计算转角过程中出现异常: 上一个位移需要比当前位移时间早")
@@ -105,5 +105,13 @@ case class Shift(from: Point, to: Point) {
 }
 
 
-/** 轨迹点差分统计特性: 轨迹的时间、速度、加速度、转角、和上一条记录的时差 */
-case class PointDiffStat(time: Long, speed: Double, accelerateVelocity: Double, corner: Double, timeDiff: Long)
+/**
+  * 轨迹点差分统计特性:
+  * 轨迹的时间、速度、加速度、转角、和上一条记录的时差
+  * @param time 时间, 单位是millisecond的时间戳
+  * @param speed 速度, 单位是m/s
+  * @param accelerateVelocity 加速度, m/s²
+  * @param corner 转角, rad
+  * @param timeDiff 时间差, 毫秒
+  */
+case class PointDiffStat(time: Long, speed: Double, accelerateVelocity: Double, corner: Double, timeDiff: Long, point: Point)
