@@ -1,11 +1,7 @@
 package com.self.core.trailCorner
 
-import java.sql.Date
-import java.text.SimpleDateFormat
-
 import com.self.core.baseApp.myAPP
 import com.self.core.trailCorner.models.{Point, PointDiffStat}
-
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -19,6 +15,7 @@ import scala.collection.mutable.ArrayBuffer
   *       另外设定转弯角度和时间的阈值之类的参数, 可以自由伸缩调节识别的不同角速度的转弯
   */
 object hoverCorner extends myAPP {
+
   /**
     * 试验的轨迹数据
     * ----
@@ -82,7 +79,6 @@ object hoverCorner extends myAPP {
       Point(1479138892000L, 16.263883, 89.1555),
       Point(1479139013000L, 16.3281, 88.889083),
       Point(1479139133000L, 16.390567, 88.627467)
-
     )
 
   /** 轨迹数据的标签 --主要是时间列，方便绘图时观察用的 */
@@ -195,7 +191,10 @@ object hoverCorner extends myAPP {
     * @return 轨迹点差分统计特性 [时间、速度、加速度、转角、时间差]
     */
   def trailDiffStat(trailData: Array[Point]): Array[PointDiffStat] = {
-    trailData.sliding(3).map {
+    if(trailData.length < 3)
+      Array.empty[PointDiffStat]
+    else
+      trailData.sliding(3).map {
       // 领先2阶, 领先1阶, 当前
       case Array(p2, p1, p) =>
         val shift1 = p2 --> p1
@@ -288,16 +287,11 @@ object hoverCorner extends myAPP {
       */
     trailData.foreach {
       pointDiffStat =>
-        println("-" * 80)
-        println("pointDiff", pointDiffStat)
-        println("旧轨迹结束为", trailFinish(pointDiffStat))
         // 轨迹开启状态
         if (trailFinish(pointDiffStat)) {
           // 录入数据并清空缓存
           if (gate) {
             res += Tuple2(trailId, arrayBuffer)
-            println("录入数据")
-
             trailId += 1
             arrayBuffer = ArrayBuffer.empty[PointDiffStat]
             gate = false
@@ -313,21 +307,16 @@ object hoverCorner extends myAPP {
           lastRecordPointTime = pointDiffStat.time
           // 有效数据, 往缓存中记录
           if (pointDiffStat.speed >= minMovingSpeed) {
-            println("往缓存中记录数据")
-
             lastMovingPointTime = pointDiffStat.time
-
             arrayBuffer += pointDiffStat
             gate = true
           }
         }
-
     }
 
     // 最后看看录入数据
     if (gate) {
       res += Tuple2(trailId, arrayBuffer)
-
       trailId += 1
       arrayBuffer = ArrayBuffer.empty[PointDiffStat]
       gate = false
@@ -347,8 +336,6 @@ object hoverCorner extends myAPP {
 
     /** 轨迹点差分统计 */
     val statData: Array[PointDiffStat] = trailDiffStat(trailData)
-    println("差分统计")
-    statData.take(10).foreach(println)
 
     /** 异常点过滤 */
     val filterData = trailAbnormalFilter(statData)
@@ -364,18 +351,13 @@ object hoverCorner extends myAPP {
       maxNoRecordTime
     )
 
-    println("分离轨迹的结果")
-    trails.foreach {
-      case (index, trail: ArrayBuffer[PointDiffStat]) =>
-        println(s"------第${index}条轨迹------")
-        trail.foreach(println)
-    }
-
     val trail = trails(0)._2
     val minHoverCorner: Double = scala.math.Pi * 1 / 2
-    val minHoverAvgAngularVelocity = minHoverCorner / (15 * 60)
-    val hoverTrail = trailFind(trail, minHoverCorner, minHoverAvgAngularVelocity)
+    val minHoverAvgAngularVelocity = minHoverCorner / (10 * 60)
+    val validCornerThreshold = 10.0 / 180 * scala.math.Pi
+    val hoverTrail = trailFind(trail, minHoverCorner, minHoverAvgAngularVelocity, validCornerThreshold)
 
+    hoverTrail.map(_.corner).foreach(println)
     plotTheTrace(hoverTrail.map(_.point).toArray, labels = (_: Int) => "a")
   }
 
@@ -390,26 +372,38 @@ object hoverCorner extends myAPP {
     * @param trail 轨迹, 默认按时间绝对单调有序排列
     *              盘旋最小转角 --单位: rad, 一般意义上盘旋应该至少为Pi, 否则就只是转完了.
     *              盘旋最小平均角速度 --单位: rad/s, 可以利用盘旋最小转角/最大转一圈用的时间(单位是秒)
+    *              有效转角阈值 --单位: rad, 如果绝对值低于该阈值会被认为没有转角, 在求盘旋起止点的时候不会被遍历,
+    *              但在加和求平均的时候会被加上.
     */
   def trailFind(
                  trail: ArrayBuffer[PointDiffStat],
                  minHoverCorner: Double,
-                 minHoverAvgAngularVelocity: Double
+                 minHoverAvgAngularVelocity: Double,
+                 validCornerThreshold: Double
                ): ArrayBuffer[PointDiffStat] = {
-    val cumulativeDistribution = trail.map { point => (point.time, point.corner) }.scanLeft((0L, 0.0, -1)) {
-      case ((_, resCorner, resIndex), (time, corner)) =>
-        (time, resCorner + corner, resIndex + 1)
+    val cumulativeDistribution = trail.map { point => (point.time, point.corner) }.scanLeft((0L, 0.0, -1, 0.0)) {
+      case ((_, resCorner, resIndex, _), (time, corner)) =>
+        (time, resCorner + corner, resIndex + 1, corner)
     }.tail
 
+    println("cumulative", cumulativeDistribution)
+    println("aaa", cumulativeDistribution.filter {
+      case (_, _, _, corner) => scala.math.abs(corner) >= validCornerThreshold
+    })
+    val cumulativeDistributionFilter = cumulativeDistribution
+      .filter {
+        case (_, _, _, corner) => scala.math.abs(corner) >= validCornerThreshold
+      }
+      .map { case (time, resCorner, index, _) => (time, resCorner, index) }
     /** 识别所有的转弯点 --可以包括一些非转弯点 */
     var i = 0
     var hoverIndex = Set.empty[Int]
     val hoverRes = ArrayBuffer.empty[PointDiffStat]
-    while (i < cumulativeDistribution.length) {
-      val (startTime, startIndex) = (cumulativeDistribution(i)._1,
-        cumulativeDistribution(i)._3)
-      val startCorner = if (i == 0) 0.0 else cumulativeDistribution(i - 1)._2
-      val avgSeries = cumulativeDistribution.drop(i).filter {
+    while (i < cumulativeDistributionFilter.length) {
+      val (startTime, startIndex) = (cumulativeDistributionFilter(i)._1,
+        cumulativeDistributionFilter(i)._3)
+      val startCorner = if (i == 0) 0.0 else cumulativeDistributionFilter(i - 1)._2
+      val avgSeries = cumulativeDistributionFilter.drop(i).filter {
         case (time, corner, _) =>
           (time - startTime) / 1000 * minHoverAvgAngularVelocity <= scala.math.abs(corner - startCorner)
       }
