@@ -2,6 +2,8 @@ package com.self.core.trailCorner
 
 import com.self.core.baseApp.myAPP
 import com.self.core.trailCorner.models.{Point, PointDiffStat}
+import org.apache.spark.sql.types.{DoubleType, IntegerType}
+
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -79,6 +81,22 @@ object hoverCorner extends myAPP {
       Point(1479138892000L, 16.263883, 89.1555),
       Point(1479139013000L, 16.3281, 88.889083),
       Point(1479139133000L, 16.390567, 88.627467)
+    )
+
+  val trailData2 =
+    Array(
+      ("2016/11/13 15:28:40", "901112115107982S", 45.393483, 134.182317),
+      ("2016/11/13 15:30:41", "901112115107982S", 45.6484, 134.323433),
+      ("2016/11/13 15:32:41", "901112115107982S", 45.892333, 134.459733),
+      ("2016/11/13 15:36:41", "901112115107982S", 46.395817, 134.745367),
+      ("2016/11/13 15:38:41", "901112115107982S", 46.649533, 134.891633),
+      ("2016/11/13 15:40:41", "901112115107982S", 46.902383, 135.003717),
+      ("2016/11/13 15:42:41", "901112115107982S", 47.154733, 135.031183),
+      ("2016/11/13 15:48:42", "901112115107982S", 47.9272, 135.1299),
+      ("2016/11/13 16:14:45", "901112115107982S", 50.660233, 132.811783),
+      ("2016/11/13 15:54:44", "901112115107982S", 48.676167, 135.021067),
+      ("2016/11/13 16:16:46", "901112115107982S", 50.861417, 132.588967),
+      ("2016/11/13 16:18:46", "901112115107982S", 51.062767, 132.363567)
     )
 
   /** 轨迹数据的标签 --主要是时间列，方便绘图时观察用的 */
@@ -190,24 +208,24 @@ object hoverCorner extends myAPP {
     * @param trailData 预处理后的轨迹数据
     * @return 轨迹点差分统计特性 [时间、速度、加速度、转角、时间差]
     */
-  def trailDiffStat(trailData: Array[Point]): Array[PointDiffStat] = {
-    if(trailData.length < 3)
+  def trailDiffStat(trailData: Iterable[Point]): Array[PointDiffStat] = {
+    if (trailData.size < 3)
       Array.empty[PointDiffStat]
     else
-      trailData.sliding(3).map {
-      // 领先2阶, 领先1阶, 当前
-      case Array(p2, p1, p) =>
-        val shift1 = p2 --> p1
-        val shift = p1 --> p
-        // 平均速度
-        val speed = shift.speed
-        // 平均加速度 --注意这里时间是: (t - t2) / 2
-        val accelerateVelocity = shift1.accelerateVelocityTo(shift)
-        // 转角 --领先1阶的速度方向到当前速度方向的转角: 范围是[-Pi, Pi]
-        val corner = shift1.cornerTo(shift)
+      trailData.toArray.sliding(3).map {
+        // 领先2阶, 领先1阶, 当前
+        case Array(p2, p1, p) =>
+          val shift1 = p2 --> p1
+          val shift = p1 --> p
+          // 平均速度
+          val speed = shift.speed
+          // 平均加速度 --注意这里时间是: (t - t2) / 2
+          val accelerateVelocity = shift1.accelerateVelocityTo(shift)
+          // 转角 --领先1阶的速度方向到当前速度方向的转角: 范围是[-Pi, Pi]
+          val corner = shift1.cornerTo(shift)
 
-        PointDiffStat(p.time, speed, accelerateVelocity, corner, shift.timeDiff, shift.to)
-    }.toArray
+          PointDiffStat(p.time, speed, accelerateVelocity, corner, shift.timeDiff, shift.to)
+      }.toArray
   }
 
   /**
@@ -216,7 +234,8 @@ object hoverCorner extends myAPP {
     * @param trailData 差分统计后的数据
     * @return 过滤异常点后的数据
     */
-  def trailAbnormalFilter(trailData: Array[PointDiffStat]): Array[PointDiffStat] = trailData
+  def trailAbnormalFilter(trailData: Array[PointDiffStat]): Array[PointDiffStat] =
+    trailData.filter(pointDiff => pointDiff.accelerateVelocity <= 50.0 && pointDiff.speed <= 1000.0)
 
   /**
     * 轨迹分离
@@ -328,40 +347,6 @@ object hoverCorner extends myAPP {
     }
   }
 
-
-  def test(trailData: Array[Point]): Unit = {
-    /** trailData要求: 每个时间对应唯一一个点且轨迹按时间单调有序 --该函数内不再做判断 */
-    /** 确认轨迹中点的条数超过5条, 否则无法支撑后面的计算 */
-    //    if(trailData.length <= 5)
-
-    /** 轨迹点差分统计 */
-    val statData: Array[PointDiffStat] = trailDiffStat(trailData)
-
-    /** 异常点过滤 */
-    val filterData = trailAbnormalFilter(statData)
-
-    /** 轨迹分离 */
-    val minMovingSpeed: Double = 5
-    val maxStaticPeriod: Long = 30 * 60 * 1000
-    val maxNoRecordTime: Long = 30 * 60 * 1000
-    val trails = trailDisperse(
-      filterData,
-      minMovingSpeed,
-      maxStaticPeriod,
-      maxNoRecordTime
-    )
-
-    val trail = trails(0)._2
-    val minHoverCorner: Double = scala.math.Pi * 1 / 2
-    val minHoverAvgAngularVelocity = minHoverCorner / (10 * 60)
-    val validCornerThreshold = 10.0 / 180 * scala.math.Pi
-    val hoverTrail = trailFind(trail, minHoverCorner, minHoverAvgAngularVelocity, validCornerThreshold)
-
-    hoverTrail.map(_.corner).foreach(println)
-    plotTheTrace(hoverTrail.map(_.point).toArray, labels = (_: Int) => "a")
-  }
-
-
   /**
     * 发现每条轨迹的盘旋状态
     * ----
@@ -369,7 +354,7 @@ object hoverCorner extends myAPP {
     * 在较短时间内轨迹形成较大的转角 --从[转角，平均速度的角度看]: 转角超过一定范围，且平均转角速度大于等于某个阈值。
     * 即目标的轨迹形成超过盘旋应有的最小转角, 且这段轨迹的平均转角速度超过最小转角速度[[]]
     *
-    * @param trail 轨迹, 默认按时间绝对单调有序排列
+    * @param trail 轨迹, 默认按时间绝对单调有序排列, 每个轨迹至少5个点，这里不再做判断
     *              盘旋最小转角 --单位: rad, 一般意义上盘旋应该至少为Pi, 否则就只是转完了.
     *              盘旋最小平均角速度 --单位: rad/s, 可以利用盘旋最小转角/最大转一圈用的时间(单位是秒)
     *              有效转角阈值 --单位: rad, 如果绝对值低于该阈值会被认为没有转角, 在求盘旋起止点的时候不会被遍历,
@@ -386,15 +371,15 @@ object hoverCorner extends myAPP {
         (time, resCorner + corner, resIndex + 1, corner)
     }.tail
 
-    println("cumulative", cumulativeDistribution)
-    println("aaa", cumulativeDistribution.filter {
-      case (_, _, _, corner) => scala.math.abs(corner) >= validCornerThreshold
-    })
+    /** 去掉一个最大值点和最小值点, 预防噪声 */
+    val oneMaxCornerId = cumulativeDistribution.maxBy(_._4)._3
+    val oneMinCornerId = cumulativeDistribution.minBy(_._4)._3
     val cumulativeDistributionFilter = cumulativeDistribution
       .filter {
-        case (_, _, _, corner) => scala.math.abs(corner) >= validCornerThreshold
-      }
-      .map { case (time, resCorner, index, _) => (time, resCorner, index) }
+        case (_, _, index, corner) =>
+          scala.math.abs(corner) >= validCornerThreshold &&
+            index != oneMinCornerId && index != oneMaxCornerId
+      }.map { case (time, resCorner, index, _) => (time, resCorner, index) }
     /** 识别所有的转弯点 --可以包括一些非转弯点 */
     var i = 0
     var hoverIndex = Set.empty[Int]
@@ -428,6 +413,43 @@ object hoverCorner extends myAPP {
     hoverRes
   }
 
+  def test(trailData: Array[Point]): Unit = {
+    /** trailData要求: 每个时间对应唯一一个点且轨迹按时间单调有序 --该函数内不再做判断 */
+    /** 确认轨迹中点的条数超过5条, 否则无法支撑后面的计算 */
+    //    if(trailData.length <= 5)
+
+    /** 轨迹点差分统计 */
+    val statData: Array[PointDiffStat] = trailDiffStat(trailData)
+
+    /** 异常点过滤 */
+    val filterData = trailAbnormalFilter(statData)
+
+    /** 轨迹分离 */
+    val minMovingSpeed: Double = 5
+    val maxStaticPeriod: Long = 30 * 60 * 1000
+    val maxNoRecordTime: Long = 30 * 60 * 1000
+    val trails = trailDisperse(
+      filterData,
+      minMovingSpeed,
+      maxStaticPeriod,
+      maxNoRecordTime
+    )
+
+    val minHoverCorner: Double = scala.math.Pi * 1 / 2
+    val minHoverAvgAngularVelocity = minHoverCorner / (10 * 60)
+    val validCornerThreshold = 10.0 / 180 * scala.math.Pi
+
+    val hoverTrail = trails.flatMap {
+      case (trailId, trailPoints) =>
+        trailFind(trailPoints, minHoverCorner, minHoverAvgAngularVelocity, validCornerThreshold).map(
+          point =>
+            (trailId, point)
+        )
+    }
+
+    plotTheTrace(hoverTrail.filter(_._1 == 0).map(_._2.point), labels = (_: Int) => "a")
+  }
+
 
   /** 测试[[Point]]和[[com.self.core.trailCorner.models.Shift]]中距离计算、转角计算的准确与否 */
   def testTrailPoint(): Unit = {
@@ -458,6 +480,177 @@ object hoverCorner extends myAPP {
     // 0.3392000000000053, 33.739公里
   }
 
+  /** 脚本代码 */
+  def zzjzScript(): Unit = {
+    import java.sql.Date
+    import java.text.SimpleDateFormat
+
+    import com.google.gson.JsonParser
+    import com.self.core.featurePretreatment.utils.Tools
+    import org.apache.spark.sql.columnUtils.DataTypeImpl._
+    import org.apache.spark.sql.types.{StringType, StructField, StructType}
+    import org.apache.spark.sql.{DataFrame, Row}
+
+    val z1 = z
+
+    /** 0)平台的系统变量和基本的json配置 */
+    val jsonParam = "<#jsonparam#>"
+    val parser = new JsonParser()
+    val pJsonParser = parser.parse(jsonParam).getAsJsonObject
+    val rddTableName = "<#zzjzRddName#>"
+
+    /** 1)输入数据 */
+    val tableName = pJsonParser.get("inputTableName").getAsString
+    val rawDataFrame = z1.rdd(tableName).asInstanceOf[DataFrame]
+    try {
+      rawDataFrame.schema.fieldNames.length
+    } catch {
+      case _: Exception => throw new Exception(s"在获得数据'$tableName'时失败，请确保您填入的是上一个结点输出的数据")
+    }
+
+    /** 2)字段处理 */
+    //imsi列名
+    val imsiCol = pJsonParser.get("imsiCol").getAsJsonArray.get(0).getAsJsonObject.get("name").getAsString
+    Tools.columnExists(imsiCol, rawDataFrame, true)
+    require(
+      rawDataFrame.schema(imsiCol).dataType == StringType,
+      s"需要'$imsiCol'是String类型"
+    )
+
+    //时间字符串列名及其信息
+    val timeCol = pJsonParser.get("timeCol").getAsJsonArray.get(0).getAsJsonObject.get("name").getAsString
+    Tools.columnExists(timeCol, rawDataFrame, true)
+    require(
+      rawDataFrame.schema(timeCol).dataType == StringType,
+      s"需要'$timeCol'是时间字符串类型"
+    )
+    val timeFormat = pJsonParser.get("timeFormat").getAsString
+    val timeParser = try {
+      new SimpleDateFormat(timeFormat)
+    } catch {
+      case e: Exception => throw new Exception(s"您填入的时间字符串格式: ${timeFormat}可能并不是合法的时间字符串格式, " +
+        s"具体信息: ${e.getMessage}")
+    }
+    // 经纬度
+    val latCol = pJsonParser.get("latCol").getAsJsonArray.get(0).getAsJsonObject.get("name").getAsString
+    Tools.columnExists(latCol, rawDataFrame, true)
+    require(
+      rawDataFrame.schema(latCol).dataType in "atomic",
+      s"需要'$latCol'是能转为数值的原子类型"
+    )
+
+    val longCol = pJsonParser.get("longCol").getAsJsonArray.get(0).getAsJsonObject.get("name").getAsString
+    Tools.columnExists(longCol, rawDataFrame, true)
+    require(
+      rawDataFrame.schema(longCol).dataType in "atomic",
+      s"需要'$longCol'是能转为数值的原子类型"
+    )
+
+    /** 根据原数据获得有效记录[imsi, (time, latitude, longitude)] */
+    val rdd = rawDataFrame.select(imsiCol, timeCol, latCol, longCol).rdd.map {
+      row =>
+        var dataValid = true
+        if (row.isNullAt(0) || row.isNullAt(1) || row.isNullAt(2) || row.isNullAt(3)) {
+          dataValid = false
+          (dataValid, ("", Point(-1L, 0.0, 0.0)))
+        } else {
+          val imsi = row.get(0).toString.trim
+          val timeString = row.getAs[String](timeCol)
+          if (imsi.trim.isEmpty)
+            dataValid = false
+          // 以毫秒为单位
+          val time = util.Try(timeParser.parse(timeString).getTime).getOrElse {
+            dataValid = false
+            -1L
+          }
+
+          val latitude = util.Try(row.get(2).toString.toDouble).getOrElse {
+            dataValid = false
+            0.0
+          }
+          val longitude = util.Try(row.get(3).toString.toDouble).getOrElse {
+            dataValid = false
+            0.0
+          }
+          (dataValid, (imsi, Point(time, latitude, longitude)))
+        }
+    }.filter(_._1).values
+
+    /** 轨迹分离参数 */
+    /** 最小移动速度 --m/s */
+    val minMovingSpeed: Double = pJsonParser.get("minMovingSpeed").getAsString.toDouble
+    /** 单条轨迹最大静止时间 --分钟, 经验是最好5分钟以上 */
+    val maxStaticPeriod: Long = (pJsonParser.get("maxStaticPeriod").getAsString.toDouble * 60 * 1000).toLong
+    /** 最大无记录时间 --分钟, 经验是最好5分钟以上 */
+    val maxNoRecordTime: Long = (pJsonParser.get("maxNoRecordTime").getAsString.toDouble * 60 * 1000).toLong
+
+    /** 盘旋界定参数 */
+    /** 最小盘旋角度 --度数 */
+    val minHoverCorner: Double = pJsonParser.get("minHoverCorner").getAsString
+      .toDouble / 180 * scala.math.Pi
+    /** 累计旋转最小盘旋角度所用的最大时间 --单位: 分钟 */
+    val maxTimeByMinHover = pJsonParser.get("maxTimeByMinHover").getAsString.toDouble
+    val minHoverAvgAngularVelocity = minHoverCorner / (maxTimeByMinHover * 60)
+    /** 最小有效转角 --度数 */
+    val validCornerThreshold = pJsonParser.get("validCornerThreshold").getAsString.toDouble / 180 * scala.math.Pi
+
+    /** 每个目标分别对每个单条轨迹进行处理 */
+    val result = rdd.groupByKey().flatMapValues {
+      PointTrails =>
+        val points = PointTrails.map(p => (p.time, (p.latitude, p.longitude))).toMap.toArray
+          .sortBy(_._1).map {
+          case (time, (latitude, longitude)) =>
+            Point(time, latitude, longitude)
+        }
+
+        /** trailData要求: 每个时间对应唯一一个点且轨迹按时间单调有序 --该函数内不再做判断 */
+
+        /** 轨迹点差分统计 */
+        val statData: Array[PointDiffStat] = trailDiffStat(points)
+
+        /** 异常点过滤 */
+        val filterData = trailAbnormalFilter(statData)
+
+        /** 轨迹分离 */
+        val trails = trailDisperse(
+          filterData,
+          minMovingSpeed,
+          maxStaticPeriod,
+          maxNoRecordTime
+        )
+
+        val hoverTrail = trails.map {
+          case (trailId, trailPoints) =>
+            val hover = trailFind(trailPoints, minHoverCorner, minHoverAvgAngularVelocity, validCornerThreshold)
+            (trailId, hover)
+        }.filter(_._2.length >= 5).flatMap {
+          case (trailId, hover) =>
+            hover.map {
+              point => (trailId, point)
+            }
+        }
+
+        hoverTrail
+    }
+
+    val newDataFrame = rawDataFrame.sqlContext.createDataFrame(
+      result.map {
+        case (imsi, (trailId, point)) =>
+          Row(imsi, trailId, timeParser.format(new Date(point.time)), point.point.latitude, point.point.longitude, point.corner)
+      }, StructType(Array(
+        StructField("imsi", StringType), StructField("trailId", IntegerType), StructField("time", StringType),
+        StructField("latitude", DoubleType), StructField("longitude", DoubleType), StructField("corner", DoubleType)
+      )))
+
+    newDataFrame.show()
+
+    newDataFrame.cache()
+    newDataFrame.registerTempTable(rddTableName)
+    outputrdd.put(rddTableName, newDataFrame)
+
+
+  }
+
 
   override def run(): Unit = {
     //    testTrailPoint()
@@ -468,8 +661,6 @@ object hoverCorner extends myAPP {
     //        plotTheTrace(trailData)
 
     //    val res = scripts()
-
-
     test(trailData)
 
 
