@@ -310,7 +310,7 @@ object Clique extends myAPP {
     }
 
     /** 基于深度优先的遍历 */
-    CliqueUtils.dfs(denseCells: Array[Seq[Int]])
+    val aa = CliqueUtils.dfs(denseCells: Array[Seq[Int]])
 
 
   }
@@ -358,18 +358,75 @@ object Clique extends myAPP {
 
     val (subGraph1, subGraph): (Int, ArrayBuffer[Seq[Int]]) = res(0)
 
+    /** 找到每个连通图的最简单表示 */
 
-    subGraph.foreach {
-      node =>
-        var candidate4node = subGraph
-        for (i <- node.indices) {
-          candidate4node = candidate4node.filter(other => other.drop(1) == node.drop(1))
+
+    //    subGraph.foreach {
+    //      node =>
+    //        var candidate4node = subGraph
+    //        for (i <- node.indices) {
+    //          candidate4node = candidate4node.filter(other => other.drop(1) == node.drop(1))
+    //        }
+    //    }
+
+    /**
+      * 从单个节点出发寻找最小表示
+      * @param subGraph
+      */
+    def miniRepresent(subGraph: ArrayBuffer[Seq[Int]]) = {
+      // 任选一个节点
+      val node = subGraph.head
+
+      var candidate4node = subGraph
+      // 依次遍历所有的维度, 维度按次序递增, 找到对于该节点最大的覆盖
+      for (dims <- node.indices) {
+        candidate4node = candidate4node.filter(other => other.drop(dims) == node.drop(dims))
+        val uu = candidate4node.map(each => each.slice(dims, dims + 1).head) // 有序的
+        var start = node.slice(dims, dims + 1).head
+        val index = uu.indexOf(start)
+        var end = node.apply(dims)
+        var flag = true
+        // 往两个方向各自走, 走到两个方向都遇到坑为止(非连续)
+        var u = 0
+        while (flag) {
+          if (index - u >= 0) {
+            val left = uu(index - u)
+            if (start - left == 1) {
+              start -= 1
+            } else {
+              flag = false
+            }
+          } else {
+            flag = false
+          }
+          u += 1
         }
+
+        flag = true
+        u = 0
+        while (flag) {
+          if (index + u < uu.length) {
+            val right = uu(index + u)
+            if (right - end == 1) {
+              start -= 1
+            } else {
+              flag = false
+            }
+          } else {
+            flag = false
+          }
+          u += 1
+        }
+
+
+      }
     }
 
-    // 未被遍历的node
-    var candidateNodes = subGraph
-    while(candidateNodes.nonEmpty) {
+
+    // 未被遍历的node, 初始化为全部连通子图
+    var candidateNodes: ArrayBuffer[Seq[Int]] = subGraph
+
+    while (candidateNodes.nonEmpty) {
       // 任选一个节点
       val node = candidateNodes.head
 
@@ -384,10 +441,10 @@ object Clique extends myAPP {
         var flag = true
         // 往两个方向各自走, 走到两个方向都遇到坑为止(非连续)
         var u = 0
-        while(flag) {
-          if(index - u >= 0) {
+        while (flag) {
+          if (index - u >= 0) {
             val left = uu(index - u)
-            if(start - left == 1){
+            if (start - left == 1) {
               start -= 1
             } else {
               flag = false
@@ -400,10 +457,10 @@ object Clique extends myAPP {
 
         flag = true
         u = 0
-        while(flag) {
-          if(index + u < uu.length) {
+        while (flag) {
+          if (index + u < uu.length) {
             val right = uu(index + u)
-            if(right - end == 1){
+            if (right - end == 1) {
               start -= 1
             } else {
               flag = false
@@ -418,13 +475,7 @@ object Clique extends myAPP {
       }
 
 
-
     }
-
-
-
-
-
 
 
   }

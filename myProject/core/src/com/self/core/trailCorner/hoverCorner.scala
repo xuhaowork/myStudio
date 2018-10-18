@@ -170,7 +170,9 @@ object hoverCorner extends myAPP {
     val latitude = new BDV[Double](trailData.map(_.latitude))
 
     // 这一段是需要的, 不知道为什么, 官网上也没有介绍
-    val a = new BDV[Int](1 to 3 toArray)
+    val a = {
+      new BDV[Int](1 to 3 toArray)
+    }
     val b = new BDM[Int](3, 3, 1 to 9 toArray)
 
     val f = Figure()
@@ -657,8 +659,7 @@ object hoverCorner extends myAPP {
 
     //    val timeLabels: Int => String = (index: Int) => trailDataLabels.getOrElse(index, "none")
 
-
-    //        plotTheTrace(trailData)
+    //    plotTheTrace(trailData)
 
     //    val res = scripts()
     test(trailData)

@@ -16,6 +16,9 @@ object CliqueUtils extends Serializable {
     * 从任意网格出发, 开启一个新的子图, 找到网格中和其相邻的网格, 找到后更新当前图,
     * 一直找直到找不到相邻网格时, 退回当前图的其他节点继续比遍历非本图的网格;
     * 当当前图所有节点遍历结束后, 重新选择任意一个未归属到任何图中的结点, 开启一个新图, 重复上述步骤, 直至没有任何未归属的点
+    *
+    * @param denseCells 初始的图数据
+    * @return Array[(连通图Id, 连通图)]
     */
   def dfs(denseCells: Array[Seq[Int]]): Array[(Int, ArrayBuffer[Seq[Int]])] = {
     // 未知世界
