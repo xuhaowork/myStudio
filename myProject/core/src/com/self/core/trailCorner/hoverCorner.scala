@@ -662,8 +662,32 @@ object hoverCorner extends myAPP {
     //    plotTheTrace(trailData)
 
     //    val res = scripts()
-    test(trailData)
+//    test(trailData)
 
+//    val df = sqlc.createDataFrame(
+//      Array(
+//        "20180201 00:00:00",
+//        "20180201 00:00:00",
+//        "2018-02-01 00:00:00",
+//        "2018-02-01 00:00:00",
+//        "2018-02-01 00:00:00",
+//        "20180201 00:00:00",
+//        "2018-02-01 00:00:00",
+//        "20180201 00:00:00"
+//      ).map(Tuple1.apply)
+//    ).toDF("cre_date")
+//    val rddTableName = "<#zzjzRddName#>"
+//    df.registerTempTable(rddTableName)
+//    df.cache()
+//    outputrdd.put(rddTableName, df)
+
+    import breeze.signal.fourierTr
+    import breeze.linalg.DenseVector
+    val uu =  fourierTr.apply(new DenseVector(Array(0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0)))
+    println(uu)
+    println(uu.length)
+
+    import org.apache.spark.sql.functions.unix_timestamp
 
   }
 }
