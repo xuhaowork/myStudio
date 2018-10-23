@@ -18,7 +18,7 @@ period <- 30 * 24 * 60 * 60 * 1000
 # 最大周期数
 steps <- 34 # 48
 
-tmp_data <- data.frame(data[, "lables"], "x" = data[, "time_stamp"] - phase)
+tmp_data <- data.frame(data[, "labels"], "x" = data[, "time_stamp"] - phase)
 tmp_colnames <- c("labels", "x")
 for(i in 1 : steps){
   tmp_data <- data.frame(tmp_data, sin4name = sin(tmp_data[, "x"] * 2 * pi / (i * period)))

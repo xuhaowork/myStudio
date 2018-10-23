@@ -16,18 +16,9 @@ object DataSimulator2 {
 
 
   def main(args: Array[String]) {
-    // 调用该模拟器需要三个参数，分为为文件路径、端口号和间隔时间（单位：毫秒）
-//    if (args.length != 3) {
-//      System.err.println("Usage: <filename> <port> <millisecond>")
-//      System.exit(1)
-//    }
-
-    // 获取指定文件总的行数
-//    val filename = args(0) // 文件路径
     val filename = "F://myStudio/people.txt"
     val lines = Source.fromFile(filename).getLines.toList // 文件内容，按行存储
     val filerow = lines.length // 行数
-
 
     // 指定监听某端口，当外部程序请求时建立连接
 //    val listener = new ServerSocket(args(1).toInt) // 根据提供的端口号建立socket
@@ -57,5 +48,4 @@ object DataSimulator2 {
     }
 
   }
-
 }

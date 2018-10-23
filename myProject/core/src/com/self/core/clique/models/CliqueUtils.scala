@@ -83,4 +83,164 @@ object CliqueUtils extends Serializable {
   }
 
 
+  /**
+    * 根据dim维的边界拓展到第dim+1维
+    *
+    * @param dim              第dim维
+    * @param initial_boundary 第dim+1维的边界初始值，一般选择初始节点的第dim+1维的值
+    * @param new_sub_graph    适用于更高维度的子图
+    * @return ((dim+1维下界, dim+1维上界), 该维度在边界内的子图)
+    */
+  def growth(dim: Int, initial_boundary: Int, new_sub_graph: ArrayBuffer[Seq[Int]])
+  : ((Int, Int), ArrayBuffer[Seq[Int]]) = {
+    // dim可能的取值, 每个取值对应的dim + 1取值
+    val range4dim_plus1 = new_sub_graph.map(e => (util.Try(e(dim)).getOrElse(-1), e(dim + 1))).groupBy(_._1)
+
+    val (left_boundary4dimP1, right_boundary4dimP1) = range4dim_plus1.keySet.map {
+      dimValue =>
+        val range4_dimValue_dimPlus1 = range4dim_plus1(dimValue).map(_._2)
+        var leftReach = false
+        var rightReach = false
+
+        // dim可能的取值, 每个取值对应的dim + 1取值
+        var left_boundary = initial_boundary
+        var right_boundary = initial_boundary
+
+        var i = 0
+        while (!(leftReach && rightReach)) {
+          /** 向左直到遇到坑 */
+          if (range4_dimValue_dimPlus1 contains initial_boundary - i) {
+            left_boundary = initial_boundary - i
+          } else {
+            leftReach = true
+          }
+
+          /** 向右直到遇到坑 */
+          if (range4_dimValue_dimPlus1 contains initial_boundary + i) {
+            right_boundary = initial_boundary + i
+          } else {
+            rightReach = true
+          }
+
+          i += 1
+        }
+        (left_boundary, right_boundary)
+    }.reduce[(Int, Int)] {
+      case ((left_boundary1, right_boundary1), (left_boundary2, right_boundary2)) =>
+        (scala.math.max(left_boundary1, left_boundary2), scala.math.min(right_boundary1, right_boundary2))
+    }
+
+    (
+      (left_boundary4dimP1, right_boundary4dimP1),
+      new_sub_graph.filter(elem => elem(dim + 1) >= left_boundary4dimP1 && elem(dim + 1) <= right_boundary4dimP1)
+    )
+  }
+
+
+  /**
+    * 寻找当前子图的最小表示以及未表示的子图
+    * ----
+    * 算法:
+    * 1）从当前子图的第一个节点为对象, K为节点的最高维度,
+    * 当前维度k = 0，待遍历子图graph2traverse = subGraph,
+    * 维度上下界dimRange = "Array.empty[(Int,Seq[Int], Seq[Int])]"，元素依次为：维度，下界，上界，注意上下界均为闭区间；
+    * 3）在维度k上从当前节点在graph2traverse内向两个方向出发，遇到“坑”时停止，找到上下界，dimRange += (k, 下界，上界)，
+    * graph2traverse = graph2traverse.filter(element => element >= 下界 && element <= 上界)；
+    * 4）k += 1，重复2和3直到k = K - 1时停止；
+    * 5）过滤未在上下界之内的子图作为未表示的子图，return (上下界, 未表示的子图)。
+    *
+    * @param subGraph 当前子图，注意不能为空
+    *                 (最小表示，当前子图和最小表示的差集）
+    */
+  def miniRepresentFromOneNode(node: Seq[Int], subGraph: ArrayBuffer[Seq[Int]]): Array[(Int, Int)] = {
+
+    val K = node.length
+    var k = -1
+    var graph2traverse = subGraph
+    val dimRange = mutable.ArrayBuilder.make[(Int, Int)]()
+    while (k < K - 1) {
+      /** 根据k维上下界和graph2traverse寻找k + 1维的上下界 --k = -1时表示初始节点 */
+      val ((left_bound, right_bound), newGraph) = growth(k, node(k + 1), graph2traverse)
+      dimRange += Tuple2(left_bound, right_bound)
+      graph2traverse = newGraph
+      k += 1
+    }
+    dimRange.result()
+  }
+
+    /** 根据k维上下界和graph2traverse寻找k + 1维的上下界 --k = -1时表示初始节点 */
+    def upSearch(
+                  node: Seq[Int],
+                  low_Boundary: Seq[Int],
+                  up_Boundary: Seq[Int],
+                  subGraph: ArrayBuffer[Seq[Int]]
+                ) = {
+      val dim = low_Boundary.length
+      val newSubGraph = subGraph.filter(
+        node =>
+          node.take(dim).zip(low_Boundary).zip(up_Boundary).foldLeft(true) {
+            case (inRange, ((value, low_bd), up_bd)) =>
+              inRange && low_bd <= value && value <= up_bd
+          })
+
+
+      /** k维度的边界 --分别从这些值出发向两侧寻找最长的连续序列 */
+      ArrayBuffer.range(low_Boundary.last, up_Boundary.last).map {
+        i =>
+
+      }
+      newSubGraph.map(_.apply(dim))
+    }
+//
+//  def aa() = {
+//    val (low_Boundary: Seq[Int], up_Boundary: Seq[Int]) = (Seq(1, 2, 3), Seq(3, 4, 5)) // 3
+//
+//
+//    var candidate4node = subGraph
+//    // 依次遍历所有的维度, 维度按次序递增, 找到对于该节点最大的覆盖
+//    for (dims <- node.indices) {
+//      candidate4node = candidate4node.filter(other => other.drop(dims) == node.drop(dims))
+//      val uu = candidate4node.map(each => each.slice(dims, dims + 1).head) // 有序的
+//      var start = node.slice(dims, dims + 1).head
+//      val index = uu.indexOf(start)
+//      var end = node.apply(dims)
+//      var flag = true
+//      // 往两个方向各自走, 走到两个方向都遇到坑为止(非连续)
+//      var u = 0
+//      while (flag) {
+//        if (index - u >= 0) {
+//          val left = uu(index - u)
+//          if (start - left == 1) {
+//            start -= 1
+//          } else {
+//            flag = false
+//          }
+//        } else {
+//          flag = false
+//        }
+//        u += 1
+//      }
+//
+//      flag = true
+//      u = 0
+//      while (flag) {
+//        if (index + u < uu.length) {
+//          val right = uu(index + u)
+//          if (right - end == 1) {
+//            start -= 1
+//          } else {
+//            flag = false
+//          }
+//        } else {
+//          flag = false
+//        }
+//        u += 1
+//      }
+//
+//    }
+//
+//
+//    }
+
+
 }

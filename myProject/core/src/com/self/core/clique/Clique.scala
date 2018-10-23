@@ -4,6 +4,7 @@ import com.self.core.baseApp.myAPP
 import com.self.core.clique.models.{CliqueUtils, FreqItem, MinMaxStandard}
 import org.apache.spark.rdd.RDD
 
+import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, Map => mutableMap}
 
 /** CLIQUE聚类算法 */
@@ -347,20 +348,38 @@ object Clique extends myAPP {
         Seq(7, 2)
       )
 
-    CliqueUtils.hotPlot(cellsData, theme = "原数据的热力图")
+//    CliqueUtils.hotPlot(cellsData, theme = "原数据的热力图")
 
     val res = CliqueUtils.dfs(cellsData: Array[Seq[Int]])
     res.foreach(println)
 
-    CliqueUtils.hotPlot(res(0)._2, theme = "连通图1的热力图")
+//    CliqueUtils.hotPlot(res(0)._2, theme = "连通图1的热力图")
 
     CliqueUtils.hotPlot(res(1)._2, theme = "连通图2的热力图")
 
-    val (subGraph1, subGraph): (Int, ArrayBuffer[Seq[Int]]) = res(0)
+    val (graphId2, subGraph2): (Int, ArrayBuffer[Seq[Int]]) = res(1)
+
+    /**
+      * 假定我选择(6, 1)这个点作为初始点，dim = -1出发
+      */
+    // 测试由-1维增加为0维的效果
+    val u = CliqueUtils.growth(0: Int, 6: Int, subGraph2: ArrayBuffer[Seq[Int]])
+    // -1维到0维的效果: (0,2)
+    println(u._1)
+    CliqueUtils.hotPlot(u._2, theme = "连通图1的按0维的第一个节点(0, 2)的0开始寻找最大表示")
+
+    val u1 = CliqueUtils.growth(1: Int, 1: Int, subGraph2: ArrayBuffer[Seq[Int]])
+    // 0维到1维的效果
+    println(u1._1)
+    CliqueUtils.hotPlot(u1._2, theme = "连通图1的按0维的第一个节点(0, 2)的0开始寻找最大表示")
+
+    /**
+      * 从(4, 2)出发寻找graph2的最大表示
+      */
+//    CliqueUtils.miniRepresentFromOneNode(Seq(4, 2), subGraph2)
+
 
     /** 找到每个连通图的最简单表示 */
-
-
     //    subGraph.foreach {
     //      node =>
     //        var candidate4node = subGraph
@@ -369,113 +388,6 @@ object Clique extends myAPP {
     //        }
     //    }
 
-    /**
-      * 从单个节点出发寻找最小表示
-      * @param subGraph
-      */
-    def miniRepresent(subGraph: ArrayBuffer[Seq[Int]]) = {
-      // 任选一个节点
-      val node = subGraph.head
-
-      var candidate4node = subGraph
-      // 依次遍历所有的维度, 维度按次序递增, 找到对于该节点最大的覆盖
-      for (dims <- node.indices) {
-        candidate4node = candidate4node.filter(other => other.drop(dims) == node.drop(dims))
-        val uu = candidate4node.map(each => each.slice(dims, dims + 1).head) // 有序的
-        var start = node.slice(dims, dims + 1).head
-        val index = uu.indexOf(start)
-        var end = node.apply(dims)
-        var flag = true
-        // 往两个方向各自走, 走到两个方向都遇到坑为止(非连续)
-        var u = 0
-        while (flag) {
-          if (index - u >= 0) {
-            val left = uu(index - u)
-            if (start - left == 1) {
-              start -= 1
-            } else {
-              flag = false
-            }
-          } else {
-            flag = false
-          }
-          u += 1
-        }
-
-        flag = true
-        u = 0
-        while (flag) {
-          if (index + u < uu.length) {
-            val right = uu(index + u)
-            if (right - end == 1) {
-              start -= 1
-            } else {
-              flag = false
-            }
-          } else {
-            flag = false
-          }
-          u += 1
-        }
-
-
-      }
-    }
-
-
-    // 未被遍历的node, 初始化为全部连通子图
-    var candidateNodes: ArrayBuffer[Seq[Int]] = subGraph
-
-    while (candidateNodes.nonEmpty) {
-      // 任选一个节点
-      val node = candidateNodes.head
-
-      var candidate4node = subGraph
-      // 依次遍历所有的维度, 维度按次序递增, 找到对于该节点最大的覆盖
-      for (dims <- node.indices) {
-        candidate4node = candidate4node.filter(other => other.drop(dims) == node.drop(dims))
-        val uu = candidate4node.map(each => each.slice(dims, dims + 1).head) // 有序的
-        var start = node.slice(dims, dims + 1).head
-        val index = uu.indexOf(start)
-        var end = node.apply(dims)
-        var flag = true
-        // 往两个方向各自走, 走到两个方向都遇到坑为止(非连续)
-        var u = 0
-        while (flag) {
-          if (index - u >= 0) {
-            val left = uu(index - u)
-            if (start - left == 1) {
-              start -= 1
-            } else {
-              flag = false
-            }
-          } else {
-            flag = false
-          }
-          u += 1
-        }
-
-        flag = true
-        u = 0
-        while (flag) {
-          if (index + u < uu.length) {
-            val right = uu(index + u)
-            if (right - end == 1) {
-              start -= 1
-            } else {
-              flag = false
-            }
-          } else {
-            flag = false
-          }
-          u += 1
-        }
-
-
-      }
-
-
-    }
 
 
   }
