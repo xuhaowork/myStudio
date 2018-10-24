@@ -166,7 +166,27 @@ object CliqueUtils extends Serializable {
       k += 1
     }
     dimRange.result()
+
   }
+
+  /**
+    * 找到当前维度的最小表示的上下界
+    * @param dim 当前维度(从0开始到K-1), K为维度数，dim维0时表示1维，也就是线，其他依次类推
+    * @param node 目标节点
+    * @param previousDimBoundary_low 上一个维度的上界 --dim为0时的上一维也就是点，此时上下界都等于node的第一个元素
+    * @param previousDimBoundary_up 上一个维度的下界 --上下界是生长的，dim为0时为一个点，dim为1时为一个线段，依次类推
+    * @param sub_graph 当前维度的最小表示候选集
+    */
+  def findTheBound(
+                    dim: Int,
+                    node: Seq[Int],
+                    previousDimBoundary_low: Seq[Int],
+                    previousDimBoundary_up: Seq[Int],
+                    sub_graph: ArrayBuffer[Seq[Int]]
+                  ) = { // @todo: 感觉时间复杂度很高，可能算法不是最优化的
+
+  }
+
 
     /** 根据k维上下界和graph2traverse寻找k + 1维的上下界 --k = -1时表示初始节点 */
     def upSearch(
