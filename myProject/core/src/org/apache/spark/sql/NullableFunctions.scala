@@ -35,19 +35,24 @@ import scala.reflect.runtime.universe.TypeTag
   * The main source idea by Martin Senne's answer on Stack OverFlow.
   */
 object NullableFunctions {
-  def udf[RT: TypeTag, A1: TypeTag](f: Function1[A1, RT])
-  : UserDefinedFunction = normalUdf[Option[RT],A1](
-      (i: A1) => i match {
-        case null => None
-        case s => Some(f(s))
-      })
+  def udf[RT: TypeTag, A1: TypeTag](f: A1 => RT)
+  : UserDefinedFunction = normalUdf[Option[RT], A1] {
+    case null => None
+    case s => Some(f(s))
+  }
 
-  def udf[RT: TypeTag, A1: TypeTag, A2: TypeTag](f: Function2[A1, A2, RT])
+  def udf[RT: TypeTag, A1: TypeTag, A2: TypeTag](f: (A1, A2) => RT)
   : UserDefinedFunction = normalUdf[Option[RT], A1, A2](
     (i1: A1, i2: A2) => (i1, i2) match {
       case (null, _) => None
       case (_, null) => None
       case (s1, s2) => Some(f(s1, s2))
     })
+
+  def udfDealWithOption[RT: TypeTag, A1: TypeTag](f: A1 => Option[RT])
+  : UserDefinedFunction = normalUdf[Option[RT], A1] {
+    case null => None
+    case s => f(s)
+  }
 
 }
