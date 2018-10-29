@@ -16,7 +16,7 @@ object DataSimulator2 {
 
 
   def main(args: Array[String]) {
-    val filename = "F://myStudio/people.txt"
+    val filename = "F://myWorkplace/people.txt"
     val lines = Source.fromFile(filename).getLines.toList // 文件内容，按行存储
     val filerow = lines.length // 行数
 

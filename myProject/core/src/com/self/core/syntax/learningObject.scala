@@ -3,10 +3,6 @@ package com.self.core.syntax
 //import java.text.SimpleDateFormat
 //
 import com.self.core.baseApp.myAPP
-import org.apache.spark.sql.Row
-import org.apache.spark.sql.types._
-
-import scala.collection.mutable
 //import org.apache.spark.deploy.master.Master
 //import org.apache.spark.rdd.RDD
 //import org.apache.spark.sql.DataFrame
@@ -221,44 +217,37 @@ object learningObject extends myAPP with Serializable {
     //
     //    println(new test[A]().mkArray2(new B(3)))
 
-    import org.apache.spark.rdd.RDD
-    import org.apache.spark.sql.DataFrame
 
-    import scala.reflect.ClassTag
-
-
-
-//    println(df.schema.fields.map(_.dataType).mkString(","))
-//    df.rdd.foreach(row => {
-//      row.get(1) match {
-//        case _: Seq[StructType] => println("good")
-//        case _: Seq[Row] => println("bad")
-//
-//      }
-//    })
+    //    println(df.schema.fields.map(_.dataType).mkString(","))
+    //    df.rdd.foreach(row => {
+    //      row.get(1) match {
+    //        case _: Seq[StructType] => println("good")
+    //        case _: Seq[Row] => println("bad")
+    //
+    //      }
+    //    })
 
 
-//
-//    def getRdd(): RDD[String] = df.rdd.map(row => row.getAs[String](1))
-//
-//    def getDataFrame(): DataFrame = df.select("category")
-//
-//    class TwoTypeOutput[T <: Serializable : ClassTag]() {
-//      def generate(method: () => T): T = {
-//        type method1 = () => RDD[String]
-//        type method2 = () => DataFrame
-//
-//        method match {
-//          case mth1: method1 => mth1()
-//          case mth2: method2 => mth2()
-//          case _ => throw new Exception("不支持其他类型的函数")
-//        }
-//      }
-//    }
-//
-//    new TwoTypeOutput[DataFrame]().generate(getDataFrame).show(3)
-//    new TwoTypeOutput[RDD[String]]().generate(getRdd).take(3).foreach(println)
-    import scala.collection.mutable.HashSet
+    //
+    //    def getRdd(): RDD[String] = df.rdd.map(row => row.getAs[String](1))
+    //
+    //    def getDataFrame(): DataFrame = df.select("category")
+    //
+    //    class TwoTypeOutput[T <: Serializable : ClassTag]() {
+    //      def generate(method: () => T): T = {
+    //        type method1 = () => RDD[String]
+    //        type method2 = () => DataFrame
+    //
+    //        method match {
+    //          case mth1: method1 => mth1()
+    //          case mth2: method2 => mth2()
+    //          case _ => throw new Exception("不支持其他类型的函数")
+    //        }
+    //      }
+    //    }
+    //
+    //    new TwoTypeOutput[DataFrame]().generate(getDataFrame).show(3)
+    //    new TwoTypeOutput[RDD[String]]().generate(getRdd).take(3).foreach(println)
 
 
     def setA(name: String, age: Int) = {
@@ -268,10 +257,44 @@ object learningObject extends myAPP with Serializable {
 
     setA("John", 18)
 
+    import org.apache.spark.sql.functions.{array, coalesce, col, collect_set, first, min}
+    val df = sqlc.createDataFrame(
+      Seq(
+        (1, 0, "A"),
+        (2, 2, "B"),
+        (1, 2, "C"),
+        (1, 2, "D"),
+        (2, 0, "E"),
+        (1, 0, "F")
+      )
+    ).toDF("col1", "col2", "col3")
 
 
+    df.groupBy(col("col1")).agg(min(col("col2")), collect_set(col("col3"))).show()
+
+    val dataFrame1 = sqlc.createDataFrame(
+      Seq(
+        ("Employee1", "salary100"),
+        ("Employee2", "salary50"),
+        ("Employee3", "salary200")
+      )).toDF("employee_A", "salary_A")
 
 
+    val dataFrame2 = sqlc.createDataFrame(
+      Seq(
+        ("Employee1", "salary100"),
+        ("Employee2", "salary50"),
+        ("Employee4", "salary600")
+      )).toDF("employee_B", "salary_B")
+
+    val joined = dataFrame1
+      .join(dataFrame2, col("employee_A") === col("employee_B"), "outer")
+      .select(
+        coalesce(col("employee_A"), col("employee_B")).as("employee"),
+        coalesce(col("salary_A"), col("salary_B")).as("salary")
+      )
+
+    joined.show()
 
 
 
