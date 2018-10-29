@@ -1,7 +1,6 @@
 package org.apache.spark.sql
 
 
-import org.apache.spark.sql.expressions.UserDefinedFunction
 import org.apache.spark.sql.functions.{udf => normalUdf}
 
 import scala.reflect.runtime.universe.TypeTag
@@ -50,7 +49,7 @@ object UDFDealWithNull {
       case (s1, s2) => Some(f(s1, s2))
     })
 
-  def udfDealWithOption[RT: TypeTag, A1: TypeTag](f: A1 => Option[RT])
+  def udfWithOption[RT: TypeTag, A1: TypeTag](f: A1 => Option[RT])
   : UserDefinedFunction = normalUdf[Option[RT], A1] {
     case null => None
     case s => f(s)
