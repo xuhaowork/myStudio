@@ -328,50 +328,50 @@ object Clique extends myAPP {
     //
     //    println(memoryMap)
 
-    /** 稠密单元 */
-    val cellsData =
-      Array(
-        Seq(0, 2),
-        Seq(1, 2),
-        Seq(1, 3),
-        Seq(2, 1),
-        Seq(2, 2),
-        Seq(2, 3),
-        Seq(4, 2),
-        Seq(4, 3),
-        Seq(5, 2),
-        Seq(5, 3),
-        Seq(6, 1),
-        Seq(6, 2),
-        Seq(6, 3),
-        Seq(7, 1),
-        Seq(7, 2)
-      )
-
-//    CliqueUtils.hotPlot(cellsData, theme = "原数据的热力图")
-
-    val res = CliqueUtils.dfs(cellsData: Array[Seq[Int]])
-    res.foreach(println)
-
-//    CliqueUtils.hotPlot(res(0)._2, theme = "连通图1的热力图")
-
-    CliqueUtils.hotPlot(res(1)._2, theme = "连通图2的热力图")
-
-    val (graphId2, subGraph2): (Int, ArrayBuffer[Seq[Int]]) = res(1)
-
-    /**
-      * 假定我选择(6, 1)这个点作为初始点，dim = -1出发
-      */
-    // 测试由-1维增加为0维的效果
-    val u = CliqueUtils.growth(0: Int, 6: Int, subGraph2: ArrayBuffer[Seq[Int]])
-    // -1维到0维的效果: (0,2)
-    println(u._1)
-    CliqueUtils.hotPlot(u._2, theme = "连通图1的按0维的第一个节点(0, 2)的0开始寻找最大表示")
-
-    val u1 = CliqueUtils.growth(1: Int, 1: Int, subGraph2: ArrayBuffer[Seq[Int]])
-    // 0维到1维的效果
-    println(u1._1)
-    CliqueUtils.hotPlot(u1._2, theme = "连通图1的按0维的第一个节点(0, 2)的0开始寻找最大表示")
+//    /** 稠密单元 */
+//    val cellsData =
+//      Array(
+//        Seq(0, 2),
+//        Seq(1, 2),
+//        Seq(1, 3),
+//        Seq(2, 1),
+//        Seq(2, 2),
+//        Seq(2, 3),
+//        Seq(4, 2),
+//        Seq(4, 3),
+//        Seq(5, 2),
+//        Seq(5, 3),
+//        Seq(6, 1),
+//        Seq(6, 2),
+//        Seq(6, 3),
+//        Seq(7, 1),
+//        Seq(7, 2)
+//      )
+//
+////    CliqueUtils.hotPlot(cellsData, theme = "原数据的热力图")
+//
+//    val res = CliqueUtils.dfs(cellsData: Array[Seq[Int]])
+//    res.foreach(println)
+//
+////    CliqueUtils.hotPlot(res(0)._2, theme = "连通图1的热力图")
+//
+//    CliqueUtils.hotPlot(res(1)._2, theme = "连通图2的热力图")
+//
+//    val (graphId2, subGraph2): (Int, ArrayBuffer[Seq[Int]]) = res(1)
+//
+//    /**
+//      * 假定我选择(6, 1)这个点作为初始点，dim = -1出发
+//      */
+//    // 测试由-1维增加为0维的效果
+//    val u = CliqueUtils.growth(0: Int, 6: Int, subGraph2: ArrayBuffer[Seq[Int]])
+//    // -1维到0维的效果: (0,2)
+//    println(u._1)
+//    CliqueUtils.hotPlot(u._2, theme = "连通图1的按0维的第一个节点(0, 2)的0开始寻找最大表示")
+//
+//    val u1 = CliqueUtils.growth(1: Int, 1: Int, subGraph2: ArrayBuffer[Seq[Int]])
+//    // 0维到1维的效果
+//    println(u1._1)
+//    CliqueUtils.hotPlot(u1._2, theme = "连通图1的按0维的第一个节点(0, 2)的0开始寻找最大表示")
 
     /**
       * 从(4, 2)出发寻找graph2的最大表示
@@ -388,6 +388,11 @@ object Clique extends myAPP {
     //        }
     //    }
 
+
+    List(1, 2, 3).asInstanceOf[List[Any]] match {
+      case _: List[Int] => println("good")
+      case _ => println("bad")
+    }
 
 
   }
