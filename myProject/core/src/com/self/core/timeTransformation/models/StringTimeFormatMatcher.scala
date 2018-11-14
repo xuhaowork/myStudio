@@ -16,7 +16,7 @@ class StringTimeFormatMatcher() extends Serializable {
     * 比如"yyyy-MM-dd HH:mm:ss.SSS"要比"yyyy-MM-dd"靠前，否则"2018-01-08 18:22:03"是能够被"yyyy-MM-dd"识别的，
     * 只是识别为"2018-01-08 00:00:00"
     */
-  val timeFormat: muMap[Char, List[SimpleDateFormat]] = muMap(
+  var timeFormat: muMap[Char, List[SimpleDateFormat]] = muMap(
     '-' ->
       List(
         new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", Locale.getDefault(Locale.Category.FORMAT)),
@@ -108,6 +108,7 @@ class StringTimeFormatMatcher() extends Serializable {
         new SimpleDateFormat("EEE dd MMM yyyy HH:mm:ss z", Locale.CHINA),
         new SimpleDateFormat("EEE dd MMM yyyy HH:mm:ss z", Locale.ENGLISH),
         new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.CHINA),
+        new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH),
         new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss z", Locale.ENGLISH)
       )
   )
@@ -115,8 +116,9 @@ class StringTimeFormatMatcher() extends Serializable {
   /**
     * 为时间字符串解析器添加时间字符串模式
     * ----
+    *
     * @param stringTimeFormat 时间字符串模式 --例如：yyyy-MM-ddEEE Z
-    * @param charSet 字符集
+    * @param charSet          字符集 CHINA |  ENGLISH | default
     * @return this
     */
   def appendTimeFormat(stringTimeFormat: String, charSet: String): this.type = {
@@ -288,22 +290,72 @@ class StringTimeFormatMatcher() extends Serializable {
     this
   }
 
+  def appendTimeFormat(stringTimeFormat: Seq[String]): this.type = {
+    stringTimeFormat.foreach {
+      sdf =>
+        appendTimeFormat(sdf, "CHINA")
+        appendTimeFormat(sdf, "ENGLISH")
+    }
+    updateRepoOrder()
+    this
+  }
+
+  def updateTimeFormat(stringTimeFormat: Seq[String]): this.type = {
+    val stf = stringTimeFormat.map {
+      stringTimeFormat =>
+        try {
+          new SimpleDateFormat(stringTimeFormat, Locale.getDefault(Locale.Category.FORMAT))
+        } catch {
+          case e: Exception => throw new Exception(
+            s"您输入的时间字符串格式'$stringTimeFormat'未能转换为时间字符串解析器，具体异常为:${e.getMessage}"
+          )
+        }
+    }
+
+    timeFormat = muMap('s' -> stf.toList)
+    updateRepoOrder()
+    this
+  }
+
+  private def updateRepoOrder(): this.type = {
+    timeFormat.foreach {
+      case (key, values) =>
+        timeFormat += (key -> values.sortBy(sdf => -sdf.format(new Date(0L)).length))
+    }
+    println(timeFormat.mapValues(sdf => sdf.map(sdf => sdf.format(new Date(0L))).mkString(",")))
+    this
+  }
+
+  /**
+    * 基于时间字符串模式分类进行解析
+    *
+    * @param category 类别 --'s'表示客户
+    * @param time     时间
+    * @return 如果解析成功返回时间戳和匹配的时间字符串样式, 否则返回(null, null)
+    */
   private def parseByCategory(category: Char)(time: String): (Timestamp, SimpleDateFormat) = {
     var res: Date = null
     var matchPattern: SimpleDateFormat = null
     var flag = false
-    val timeFormats = timeFormat(category).toIterator
-    while (!flag && timeFormats.hasNext) {
-      val timeFormat = timeFormats.next()
-      try {
-        res = timeFormat.parse(time)
-        matchPattern = timeFormat
-        flag = true
-      } catch {
-        case _: Exception =>
+    if (timeFormat.contains(category)) {
+      val timeFormats = timeFormat(category).toIterator
+      while (!flag && timeFormats.hasNext) {
+        val timeFormat = timeFormats.next()
+        try {
+          res = timeFormat.parse(time)
+          matchPattern = timeFormat
+          if(res != null){
+            println(res, timeFormat)
+            flag = true
+          }
+        } catch {
+          case _: Exception =>
+        }
+        println(flag, category)
       }
     }
-    (if(res != null) new Timestamp(res.getTime) else null, matchPattern)
+
+    if (res != null) (new Timestamp(res.getTime), matchPattern) else (null, null)
   }
 
   /**
@@ -313,20 +365,25 @@ class StringTimeFormatMatcher() extends Serializable {
     * @return 解析的Date格式和与之匹配的SimpleDateFormat
     */
   def parseFormat(string: String): (Timestamp, SimpleDateFormat) = {
-    val res = string match {
-      case time if time.toCharArray contains '-' =>
-        parseByCategory('-')(time)
-      case time if time.toCharArray contains '/' =>
-        parseByCategory('/')(time)
-      case time if time.toCharArray contains '年' =>
-        parseByCategory('年')(time)
-      case _ =>
-        null
-    }
-    if (res == null) {
+    val (ts, sdf) = parseByCategory('s')(string)
+    val res = if (ts == null) {
+      string match {
+        case time if time.toCharArray contains '-' =>
+          parseByCategory('-')(time)
+        case time if time.toCharArray contains '/' =>
+          parseByCategory('/')(time)
+        case time if time.toCharArray contains '年' =>
+          parseByCategory('年')(time) // todo: 年应该放在0中
+        case _ =>
+          (null, null)
+      }
+    } else
+      (ts, sdf)
+
+    if (res._1 == null) {
       parseByCategory('0')(string)
     } else
-      res
+      (res._1, res._2)
   }
 
   /**
