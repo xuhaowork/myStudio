@@ -1,6 +1,6 @@
 package com.self.core.timeTransformation.objects
 
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
 
 /**
   * 时间格式转换
@@ -41,14 +41,14 @@ import com.zzjz.deepinsight.basic.BaseMain
   * 毫秒
   * Timestamp
   */
-object TimeFormatTransformation extends BaseMain {
+object TimeFormatTransformation extends myAPP {
   override def run(): Unit = {
     import java.sql.Timestamp
     import java.text.SimpleDateFormat
 
     import com.google.gson.{Gson, JsonObject, JsonParser}
-    import com.zzjz.deepinsight.core.timeTransformation.models.UDFCreator
-    import com.zzjz.deepinsight.core.utils.pretreatmentUtils
+    import com.self.core.timeTransformation.models.UDFCreator
+    import com.self.core.utils.pretreatmentUtils
     import org.apache.spark.sql.functions.col
     import org.apache.spark.sql.types.{LongType, StringType, TimestampType}
 
@@ -113,9 +113,6 @@ object TimeFormatTransformation extends BaseMain {
         rawDataFrame.withColumn(outputColName, transformFunction(col(timeFieldName)))
     }
 
-    newDataFrame.createOrReplaceTempView(rddTableName)
-    newDataFrame.sqlContext.cacheTable(rddTableName)
-    outputrdd.put(rddTableName, newDataFrame)
 
   }
 }

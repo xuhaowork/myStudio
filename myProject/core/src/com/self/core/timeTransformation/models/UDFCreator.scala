@@ -5,8 +5,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 import com.google.gson.JsonObject
-import org.apache.spark.sql.UDFDealWithNull
-import org.apache.spark.sql.expressions.UserDefinedFunction
+import org.apache.spark.sql.{UDFDealWithNull, UserDefinedFunction}
 
 
 /** 创建一个时间转换的udf */

@@ -55,5 +55,11 @@ object UDFDealWithNull {
     case s => f(s)
   }
 
+  def udfDealWithOption[RT: TypeTag, A1: TypeTag](f: A1 => Option[RT])
+  : UserDefinedFunction = normalUdf[Option[RT], A1] {
+    case null => None
+    case s => f(s)
+  }
+
 
 }
