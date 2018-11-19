@@ -252,6 +252,10 @@ object learningObject extends myAPP with Serializable {
     //    new TwoTypeOutput[RDD[String]]().generate(getRdd).take(3).foreach(println)
 
 
+    import org.apache.spark.mllib.linalg.Matrix
+    val a: Matrix = null
+
+
     new SimpleDateFormat("feafeafea")
 
 //    def setA(name: String, age: Int) = {
