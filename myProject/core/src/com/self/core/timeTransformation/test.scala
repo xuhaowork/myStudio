@@ -2,14 +2,15 @@ package com.self.core.timeTransformation
 
 import java.text.SimpleDateFormat
 
-import com.zzjz.deepinsight.basic.BaseMain
+import com.self.core.baseApp.myAPP
+
 
 /**
   * editor: xuhao
   * date: 2018.10.30 09:00:00
   */
 
-object test extends BaseMain {
+object test extends myAPP {
   def createData(): Unit = {
     val times = Array(
       "Mon Jan 08 18:22:03 CST 2018",
