@@ -19,8 +19,6 @@ object LearningGraphx extends myAPP{
 //    val result = Extractor.extract[String](list)
 //    println(result) // List(1, string1, List(), string
 
-
-
     import java.io._
 
     import org.apache.spark.mllib.clustering.KMeansModel
@@ -55,11 +53,23 @@ object LearningGraphx extends myAPP{
     }
 
 
+    import org.apache.spark.sql.DataFrame
+    import org.apache.spark.sql.functions.{col, first, lit}
 
+    val df1: DataFrame = null
+    val df2: DataFrame = null
+    val keyCol: String = "key"
+    val valueCol: String = "label"
 
+    val res: DataFrame = df1.withColumn("type", lit("label_表1"))
+      .unionAll(df2.withColumn("type", lit("label_表2")))
+      .groupBy(keyCol)
+      .pivot("type", Seq("label_表1", "label_表2"))
+      .agg(first(col(valueCol)))
+    res.show()
 
-
-
+    import org.apache.spark.ml.feature.StandardScaler
+    new StandardScaler().setInputCol("").setOutputCol("").fit(df1).transform(df1)
 
 
 
