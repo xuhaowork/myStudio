@@ -143,5 +143,6 @@ class(mdat[1, , drop = F]) # 矩阵取值中不drop掉矩阵类型，此时取�
 
 
 
-
-
+path <- "F://myWorkplace/data/Bankscope_interpelate.txt"
+file_path <- file(path)
+input <- readLines(file_path, encoding = "UTF-8")
