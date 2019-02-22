@@ -21,6 +21,13 @@
     </properties>
 
 
+    <modules>
+        <module>Base</module>
+        <module>Utils</module>
+    </modules>
+
+
+
     <dependencyManagement>
         <dependencies>
             <!-- Camel BOM -->
