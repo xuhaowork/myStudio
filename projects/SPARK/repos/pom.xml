@@ -23,10 +23,10 @@
         <!-- 分两个目录管理: 一个目录管理scala本机的机器学习项目一个目录管理spark的机器学习项目 -->
 
         <!-- 以下是单向依赖的Module: 工具类/IO类/可视化类 -->
+        <!-- SPARK项目创建Main主类的快捷方式 -->
+        <module>local/MainShortCut</module>
         <!-- 工具类 -->
         <module>local/Utils</module>
-        <!-- 读写工具类 -->
-        <module>local/IOUtils</module>
         <!-- 可视化 -->
         <module>local/Plot</module>
 
@@ -34,14 +34,102 @@
         <module>spark/SparkMainShortCut</module>
         <!-- SPARK工具类 -->
         <module>spark/SparkUtils</module>
-        <!-- 基于SPARK的读写工具类 -->
-        <module>spark/SparkIOUtils</module>
-
 
         <!-- 以下是机器学习的Module: -->
         <module>Spark/SparkTimeSeries</module>
         <module>local/TimeSeries</module>
     </modules>
+
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <scala.version>2.11</scala.version>
+        <mysql.connector.version>5.13.9</mysql.connector.version>
+    </properties>
+
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-scala</artifactId>
+        </dependency>
+
+        <!-- scala -->
+        <dependency>
+            <groupId>org.scala-lang</groupId>
+            <artifactId>scala-library</artifactId>
+            <version>2.11.8</version>
+        </dependency>
+        <dependency>
+            <groupId>org.scala-lang.modules</groupId>
+            <artifactId>scala-xml_2.11</artifactId>
+            <version>1.0.6</version>
+        </dependency>
+
+        <!-- logging and testing -->
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-slf4j-impl</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_2.11</artifactId>
+            <version>3.2.0-SNAP10</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+        </dependency>
+        <dependency>
+            <groupId>org.scalacheck</groupId>
+            <artifactId>scalacheck_${scala.version}</artifactId>
+            <version>1.14.0</version>
+            <scope>test</scope>
+        </dependency>
+
+
+        <!-- breeze -->
+        <dependency>
+            <groupId>org.scalanlp</groupId>
+            <artifactId>breeze-viz_${scala.version}</artifactId>
+            <version>1.0-RC2</version>
+        </dependency>
+
+        <!-- database -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>${mysql.connector.version}</version>
+        </dependency>
+
+    </dependencies>
+
+
+
+
 
 
 
