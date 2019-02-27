@@ -1,8 +1,13 @@
+library(TSA)
 data(arma11.s)
+
+for(i in 1:length(arma11.s)) {
+  print(arma11.s[i])
+}
+
 
 z <- arma11.s
 
-self_eacf(z)
 
 ar.max = 7
 ma.max = 13
@@ -50,6 +55,8 @@ ncol <- nrow - 1
 z <- z - mean(z)
 zm <- NULL
 for (i in 1:nar) zm <- cbind(zm, lag1(z, lag = i))
+
+zm
 
 cov1 <- acf(z, lag.max = ncov, plot = FALSE, drop.lag.0 = FALSE)$acf
 
