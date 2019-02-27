@@ -6,13 +6,21 @@
 
     <parent>
         <groupId>cn.datashoe</groupId>
-        <artifactId>repos</artifactId>
+        <artifactId>SparkMainShortCut</artifactId>
         <version>1.0-SNAPSHOT</version>
         <relativePath>../..</relativePath>
     </parent>
 
     <artifactId>SparkUtils</artifactId>
     <version>1.0-SNAPSHOT</version>
+
+    <dependencies>
+        <dependency>
+            <groupId>cn.datashoe</groupId>
+            <artifactId>SparkMainShortCut</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
+    </dependencies>
 
     
 </project>
