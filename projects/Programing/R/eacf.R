@@ -1,23 +1,15 @@
 library(TSA)
 data(arma11.s)
 
-for(i in 1:length(arma11.s)) {
-  print(arma11.s[i])
-}
-
-
 z <- arma11.s
 
 
 ar.max = 7
 ma.max = 13
 
-# 滞后
 lag1 <- function(z, lag = 1) {
   c(rep(NA, lag), z[1:(length(z) - lag)])
 }
-
-# 变为上三角矩阵
 reupm <- function(m1, nrow, ncol) {
   k <- ncol - 1
   m2 <- NULL
@@ -31,20 +23,17 @@ reupm <- function(m1, nrow, ncol) {
   }
   m2
 }
-
-
 ceascf <- function(m, cov1, nar, ncol, count, ncov, z, zm) {
   result <- 0 * seq(1, nar + 1)
   result[1] <- cov1[ncov + count]
   for (i in 1:nar) {
-    temp <- cbind(z[-(1:i)], zm[-(1:i), 1:i]) %*% c(1, -m[1:i, i])
-      result[i + 1] <- acf(temp, plot = FALSE, lag.max = count, 
-                           drop.lag.0 = FALSE)$acf[count + 1]
+    temp <- cbind(z[-(1:i)], zm[-(1:i), 1:i]) %*% c(1, 
+                                                    -m[1:i, i])
+    result[i + 1] <- acf(temp, plot = FALSE, lag.max = count, 
+                         drop.lag.0 = FALSE)$acf[count + 1]
   }
   result
 }
-
-
 ar.max <- ar.max + 1
 ma.max <- ma.max + 1
 nar <- ar.max - 1
@@ -55,11 +44,7 @@ ncol <- nrow - 1
 z <- z - mean(z)
 zm <- NULL
 for (i in 1:nar) zm <- cbind(zm, lag1(z, lag = i))
-
-zm
-
 cov1 <- acf(z, lag.max = ncov, plot = FALSE, drop.lag.0 = FALSE)$acf
-
 cov1 <- c(rev(cov1[-1]), cov1)
 ncov <- ncov + 1
 m1 <- matrix(0, ncol = ncol, nrow = nrow)
@@ -83,12 +68,10 @@ for (i in 1:nma) {
 }
 rownames(symbol) <- 0:(ar.max - 1)
 colnames(symbol) <- 0:(ma.max - 1)
-cat("AR/MA\\n")
+cat("AR/MA\n")
 print(symbol, quote = FALSE)
 invisible(list(eacf = eacfm, ar.max = ar.max, ma.ma = ma.max, 
-                 symbol = symbol))
+               symbol = symbol))
 
 
-
-
-
+eacf(arma11.s)
