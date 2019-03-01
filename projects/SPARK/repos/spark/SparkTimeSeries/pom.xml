@@ -33,12 +33,6 @@
             <artifactId>breeze-viz_${scala.version}</artifactId>
             <version>0.13.2</version>
         </dependency>
-
-        <dependency>
-            <groupId>org.apache.commons</groupId>
-            <artifactId>commons-math3</artifactId>
-            <version>3.4.1</version>
-        </dependency>
     </dependencies>
 
 
