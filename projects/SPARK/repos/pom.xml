@@ -47,6 +47,7 @@
 
         <!-- 以下是机器学习的Module: -->
         <module>Spark/SparkTimeSeries</module>
+        <module>Spark/DataWrangling</module>
         <module>local/TimeSeries</module>
     </modules>
 
