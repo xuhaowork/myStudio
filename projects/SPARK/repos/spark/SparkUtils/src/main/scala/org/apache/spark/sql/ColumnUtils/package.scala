@@ -2,7 +2,6 @@ package org.apache.spark.sql
 
 
 import org.apache.spark.sql.catalyst.parser.CatalystSqlParser
-import org.apache.spark.sql.functions.col
 import org.apache.spark.sql.types._
 package object ColumnUtils {
   object ColumnImpl {
@@ -42,8 +41,6 @@ package object ColumnUtils {
                 NumericType.acceptsType(dataType)
               case "atomic" =>
                 dataType.isInstanceOf[AtomicType]
-              case "userdefinedtype" =>
-                dataType.isInstanceOf[UserDefinedType]
               case _ =>
                 dataType.sameType(CatalystSqlParser.parseDataType(name))
             }
