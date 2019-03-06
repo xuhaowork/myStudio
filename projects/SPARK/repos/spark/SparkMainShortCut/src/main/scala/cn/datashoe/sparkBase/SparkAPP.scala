@@ -12,7 +12,9 @@ abstract class SparkAPP extends App {
   lazy val cfg: SparkConf = new SparkConf()
     .setAppName("DataShoe_Learning")
     .setMaster("local[*]")
-    .set("spark.sql.warehouse.dir", Memory.MY_WORKPLACE_SPARK)
+    .set("spark.sql.warehouse.dir", Memory.MY_WORKPLACE_SPARK + "\\conf\\spark_dir")
+
+  System.setProperty("hadoop.home.dir", Memory.MY_WORKPLACE_SPARK + "\\conf\\hadoop_dir")
 
   /** SparkContext and sqlContext */
   lazy val sparks: SparkSession = SparkSession.builder().config(cfg).getOrCreate()
