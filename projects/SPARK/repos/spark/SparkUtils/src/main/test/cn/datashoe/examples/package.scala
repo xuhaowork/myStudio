@@ -25,7 +25,7 @@ package object examples {
     import org.apache.hadoop.mapred.TextInputFormat
 
     val sc: SparkContext = null
-    val path: String = _
+    val path: String = null
     sc.hadoopFile(path, classOf[TextInputFormat], classOf[LongWritable], classOf[Text], 1)
       .map(p => new String(p._2.getBytes, 0, p._2.getLength, "GBK"))
   }
@@ -40,7 +40,7 @@ package object examples {
     val tableNameNew = ""
     val saveMode = ""
 
-    val df: DataFrame = _
+    val df: DataFrame = null
 
     val url = s"jdbc:mysql://$host:$port/$base?rewriteBatchedStatements=true&useUnicode=true&characterEncoding=UTF8"
     val pro = new Properties()
@@ -64,7 +64,7 @@ package object examples {
 
 
   def readHBase(): Unit = {
-    val sqlc: SQLContext = _
+    val sqlc: SQLContext = null
     val tableName = "table"
     val family = "students"
     val column = "code"
@@ -103,7 +103,7 @@ package object examples {
     var inputDF: DataFrame = null
     var outputDF: DataFrame = null
 
-    val sqlc: SQLContext = _
+    val sqlc: SQLContext = null
 
 
     val tableName = ""
@@ -191,7 +191,7 @@ package object examples {
 
     val orginData = inputDF.collect()
 
-    val sc: SparkContext = _
+    val sc: SparkContext = null
 
     val rdd = sc.makeRDD(for (i <- 0 until n) yield {
       Row.merge(orginData(i), Row(retLable(i)))

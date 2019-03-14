@@ -7,7 +7,11 @@ import org.scalatest.FunSuite
 
 // @todo: 加入对特殊字符列名的兼容
 class PivotSuite extends FunSuite {
-  test("pivot基本功能") {
+  test("字符串格式化") {
+    val precision = 0
+    val format = "%." + precision + "f%%"
+    println("字符串格式化:" + format.format(0.77788889999 * 100))
+
     //    val data = DataSimulate.salaryData(6000, 4)
     //    data.show()
     //

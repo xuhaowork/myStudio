@@ -185,7 +185,7 @@ package object IOUtils {
       val sql = "select * from user"
 
       val url = "jdbc:mysql://mysqlHost:3306/database"
-      val sQLContext: SQLContext = _
+      val sQLContext: SQLContext = null
 
       // 还可以添加predicates: Array("2016-01-02 00:00:00", "2016-01-02 01:00:00")
       val comm = sQLContext.read.jdbc(url, "(" + sql + ") TEMPTABLEQQQ", prop)
@@ -203,7 +203,7 @@ package object IOUtils {
       val tableName = "table"
       val family = ""
       val column = ""
-      val sQLContext: SQLContext = _
+      val sQLContext: SQLContext = null
       val catalogTemplate =
         s"""{
            |"table":{"namespace":"default", "name":"$tableName", "tableCoder":"PrimitiveType"},
