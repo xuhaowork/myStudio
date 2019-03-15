@@ -173,6 +173,8 @@ object Pivot2 extends SparkAPP {
           false, false, "false", false, "2", true)
     }
 
+    import org.apache.spark.sql.functions.monotonically_increasing_id
+
 
     /**
       * 2.数据处理
