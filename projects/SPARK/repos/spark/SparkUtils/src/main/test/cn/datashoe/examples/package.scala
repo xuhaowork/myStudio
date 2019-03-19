@@ -130,6 +130,7 @@ package object examples {
       new CoverTree[Array[Double]](inputData, new EuclideanDistance)
     }
 
+
     // 计算邻居矩阵
     val connectivity = CSCMatrix.zeros[Double](n, n)
     for (i <- 0 until n) {
@@ -138,6 +139,7 @@ package object examples {
         connectivity(i, neighbor.index) = 1
       })
     }
+
 
     // 计算相似矩阵
     val affinityMatrix = (connectivity + connectivity.t) * 0.5
@@ -170,7 +172,14 @@ package object examples {
     //Stopwatch.restart("begin arpack")
 
     // 计算特征向量
-    val data = MatrixOpsWithARPACK.eigen(v => MatrixOpsWithLAPACK.solve(lu, p, v), n, clusteringCnt, tol = 0.0, maxIterations = 1000, sigma = 1.0)
+    val data = MatrixOpsWithARPACK.eigen(
+      v => MatrixOpsWithLAPACK.solve(lu, p, v),
+      n,
+      clusteringCnt,
+      tol = 0.0,
+      maxIterations = 1000,
+      sigma = 1.0
+    )
 
     //Stopwatch.end()
 

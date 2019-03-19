@@ -1,8 +1,12 @@
 package cn.datashoe
 
+import java.io.File
+import java.nio.charset.Charset
+
+import org.apache.commons.io.FileUtils
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.hbase.HBaseConfiguration
-import org.apache.spark.sql.SQLContext
+import org.apache.spark.sql.{DataFrame, SQLContext}
 import org.apache.spark.sql.datasources.hbase.HBaseTableCatalog
 
 
@@ -192,6 +196,49 @@ package object IOUtils {
       val df = comm.repartition(5)
       df.cache()
 
+
+      // mpp
+      {
+        import java.util.Properties
+
+        val rddTableName = "<#rddtablename#>"
+
+        val sql = "(select * from tl_testdata_filter) as aa"
+        val prop = new Properties()
+        prop.setProperty("user", "bgetl")
+        prop.setProperty("password", "Bigdata123@")
+        prop.setProperty("driver", "org.postgresql.Driver")
+        val url = "jdbc:postgresql://%s:%d/%s".format("11.39.222.98", 25308, "ods")
+        val newDataFrame = sqlc.read.jdbc(url, sql, prop)
+
+        newDataFrame.cache()
+        outputrdd.put(rddTableName, newDataFrame)
+        newDataFrame.registerTempTable(rddTableName)
+        sqlc.cacheTable(rddTableName)
+
+        newDataFrame.show()
+
+      }
+
+
+      // jdbc
+      def readDataBase(url: String = "jdbc:mysql://192.168.11.26:3306/test",
+                       table: String,
+                       usr: String = "oozie",   // "oozie",
+                       passWord: String = "oozie",
+                       dataBaseType: String = "MySQL"): DataFrame = {
+        val prop = new Properties()
+        prop.setProperty("user", usr)
+        prop.setProperty("password", passWord)
+        dataBaseType.toLowerCase match {
+          case "mysql" => prop.setProperty("driver", "com.mysql.jdbc.Driver")
+          case "oracle" => prop.setProperty("driver", "oracle.jdbc.driver.OracleDriver")
+          case "sqlserver" => prop.setProperty("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver")
+          case "gbase" => prop.setProperty("driver", "com.gbase.jdbc.Driver")
+        }
+        sqlc.read.jdbc(url, table, prop)
+      }
+
     }
 
 
@@ -222,6 +269,33 @@ package object IOUtils {
         .load()
       df
 
+    }
+
+  }
+
+
+  // 文件读取
+  object fileIO {
+    def read(): Unit = {
+      FileUtils.readFileToString(new File(pth), Charset.forName(encoding))
+    }
+
+    /**
+      * 为路径加上user.dir
+      * ----
+      * 功能: 用于一些resources文件读取, 确保在不同机器运行效果一致
+      * ----
+      *
+      * @param path 路径
+      * @return 绝对路径
+      */
+    def addUserDir2Path(path: String): String = {
+      println(s"user.dir为: ${System.getProperty("user.dir")}")
+      val userDir = s"${System.getProperty("user.dir")}".replaceAll("\\\\", "\\/")
+      if (userDir.endsWith("/") || path.replaceAll("\\\\", "\\/").endsWith("/"))
+        userDir + path.replaceAll("\\\\", "\\/")
+      else
+        userDir + "/" + path.replaceAll("\\\\", "\\/")
     }
 
   }

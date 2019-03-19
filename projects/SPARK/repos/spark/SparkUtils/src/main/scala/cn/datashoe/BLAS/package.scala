@@ -11,6 +11,9 @@ package object BLAS {
   }
 
   object MatrixOpsWithARPACK {
+    // http://www.netlib.org/lapack/explore-html/index.html
+
+
 
     // 使用ARPACK算法实现特征向量分解
     // 模式1只需要乘, 模式3需要方程组求解
