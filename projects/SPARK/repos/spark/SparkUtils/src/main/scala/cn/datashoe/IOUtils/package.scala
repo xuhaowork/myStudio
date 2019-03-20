@@ -169,75 +169,75 @@ package object IOUtils {
     }
 
 
-    def read(): Unit = {
-      import java.util.Properties
-
-      import org.apache.spark.sql.SQLContext
-
-      val prop = new Properties()
-      prop.setProperty("user", "")
-      prop.setProperty("password", "")
-
-      prop.setProperty("zeroDateTimeBehavior", "convertToNull") //非法日期值转为null
-
-      prop.setProperty("driver", "com.mysql.jdbc.Driver")
-      prop.setProperty("driver", "oracle.jdbc.driver.OracleDriver")
-      prop.setProperty("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver")
-      prop.setProperty("driver", "com.gbase.jdbc.Driver")
-      prop.setProperty("driver", "org.postgresql.Driver")
-
-      val sql = "select * from user"
-
-      val url = "jdbc:mysql://mysqlHost:3306/database"
-      val sQLContext: SQLContext = null
-
-      // 还可以添加predicates: Array("2016-01-02 00:00:00", "2016-01-02 01:00:00")
-      val comm = sQLContext.read.jdbc(url, "(" + sql + ") TEMPTABLEQQQ", prop)
-      val df = comm.repartition(5)
-      df.cache()
-
-
-      // mpp
-      {
-        import java.util.Properties
-
-        val rddTableName = "<#rddtablename#>"
-
-        val sql = "(select * from tl_testdata_filter) as aa"
-        val prop = new Properties()
-        prop.setProperty("user", "bgetl")
-        prop.setProperty("password", "Bigdata123@")
-        prop.setProperty("driver", "org.postgresql.Driver")
-        val url = "jdbc:postgresql://%s:%d/%s".format("11.39.222.98", 25308, "ods")
-        val newDataFrame = sqlc.read.jdbc(url, sql, prop)
-
-        newDataFrame.cache()
-        outputrdd.put(rddTableName, newDataFrame)
-        newDataFrame.registerTempTable(rddTableName)
-        sqlc.cacheTable(rddTableName)
-
-        newDataFrame.show()
-
-      }
-
-
-      // jdbc
-      def readDataBase(url: String = "jdbc:mysql://192.168.11.26:3306/test",
-                       table: String,
-                       usr: String = "oozie",   // "oozie",
-                       passWord: String = "oozie",
-                       dataBaseType: String = "MySQL"): DataFrame = {
-        val prop = new Properties()
-        prop.setProperty("user", usr)
-        prop.setProperty("password", passWord)
-        dataBaseType.toLowerCase match {
-          case "mysql" => prop.setProperty("driver", "com.mysql.jdbc.Driver")
-          case "oracle" => prop.setProperty("driver", "oracle.jdbc.driver.OracleDriver")
-          case "sqlserver" => prop.setProperty("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver")
-          case "gbase" => prop.setProperty("driver", "com.gbase.jdbc.Driver")
-        }
-        sqlc.read.jdbc(url, table, prop)
-      }
+//    def read(): Unit = {
+//      import java.util.Properties
+//
+//      import org.apache.spark.sql.SQLContext
+//
+//      val prop = new Properties()
+//      prop.setProperty("user", "")
+//      prop.setProperty("password", "")
+//
+//      prop.setProperty("zeroDateTimeBehavior", "convertToNull") //非法日期值转为null
+//
+//      prop.setProperty("driver", "com.mysql.jdbc.Driver")
+//      prop.setProperty("driver", "oracle.jdbc.driver.OracleDriver")
+//      prop.setProperty("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver")
+//      prop.setProperty("driver", "com.gbase.jdbc.Driver")
+//      prop.setProperty("driver", "org.postgresql.Driver")
+//
+//      val sql = "select * from user"
+//
+//      val url = "jdbc:mysql://mysqlHost:3306/database"
+//      val sQLContext: SQLContext = null
+//
+//      // 还可以添加predicates: Array("2016-01-02 00:00:00", "2016-01-02 01:00:00")
+//      val comm = sQLContext.read.jdbc(url, "(" + sql + ") TEMPTABLEQQQ", prop)
+//      val df = comm.repartition(5)
+//      df.cache()
+//
+//
+//      // mpp
+//      {
+//        import java.util.Properties
+//
+//        val rddTableName = "<#rddtablename#>"
+//
+//        val sql = "(select * from tl_testdata_filter) as aa"
+//        val prop = new Properties()
+//        prop.setProperty("user", "bgetl")
+//        prop.setProperty("password", "Bigdata123@")
+//        prop.setProperty("driver", "org.postgresql.Driver")
+//        val url = "jdbc:postgresql://%s:%d/%s".format("11.39.222.98", 25308, "ods")
+//        val newDataFrame = sqlc.read.jdbc(url, sql, prop)
+//
+//        newDataFrame.cache()
+//        outputrdd.put(rddTableName, newDataFrame)
+//        newDataFrame.registerTempTable(rddTableName)
+//        sqlc.cacheTable(rddTableName)
+//
+//        newDataFrame.show()
+//
+//      }
+//
+//
+//      // jdbc
+//      def readDataBase(url: String = "jdbc:mysql://192.168.11.26:3306/test",
+//                       table: String,
+//                       usr: String = "oozie",   // "oozie",
+//                       passWord: String = "oozie",
+//                       dataBaseType: String = "MySQL"): DataFrame = {
+//        val prop = new Properties()
+//        prop.setProperty("user", usr)
+//        prop.setProperty("password", passWord)
+//        dataBaseType.toLowerCase match {
+//          case "mysql" => prop.setProperty("driver", "com.mysql.jdbc.Driver")
+//          case "oracle" => prop.setProperty("driver", "oracle.jdbc.driver.OracleDriver")
+//          case "sqlserver" => prop.setProperty("driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver")
+//          case "gbase" => prop.setProperty("driver", "com.gbase.jdbc.Driver")
+//        }
+//        sqlc.read.jdbc(url, table, prop)
+//      }
 
     }
 
@@ -277,7 +277,7 @@ package object IOUtils {
   // 文件读取
   object fileIO {
     def read(): Unit = {
-      FileUtils.readFileToString(new File(pth), Charset.forName(encoding))
+//      FileUtils.readFileToString(new File(pth), Charset.forName(encoding))
     }
 
     /**
@@ -299,6 +299,3 @@ package object IOUtils {
     }
 
   }
-
-
-}

@@ -8,5 +8,8 @@ object TestSparkAPP extends SparkAPP {
 
     sqlc.createDataFrame(Seq.range(0, 100).map(Tuple1.apply)).show()
 
+
+
+
   }
 }

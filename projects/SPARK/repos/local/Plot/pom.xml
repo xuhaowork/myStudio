@@ -15,4 +15,14 @@
     <version>1.0-SNAPSHOT</version>
 
 
+    <dependencies>
+        <!-- https://mvnrepository.com/artifact/org.scalanlp/breeze-viz -->
+        <dependency>
+            <groupId>org.scalanlp</groupId>
+            <artifactId>breeze-viz_${scala.version}</artifactId>
+            <version>0.13.2</version>
+        </dependency>
+    </dependencies>
+
+
 </project>
