@@ -68,7 +68,6 @@ class TimeWranglingSuite() extends FunSuite {
     // 设置9需要为东9区, 东9区比东8区快1个小时
     require(s2 == "2019-03-27T10:30:00+09:00")
 
-
     println(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Timestamp(-110014009196L)))
   }
 
