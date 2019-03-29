@@ -281,12 +281,14 @@ class TimeInSpark extends FunSuite{
 
     // 631123200000L +08
     // 644166000000L +09
+    // 因为是夏令时
     val dt = new Date(1564588800000L)
     println(sdf.format(dt), dt.getTimezoneOffset)
     val dt2 = new java.sql.Date(644166000000L)
     println(sdf.format(dt2), dt2.getTimezoneOffset)
     val dt3 = new Timestamp(644166000000L)
     println(sdf.format(dt3), dt3.getTimezoneOffset)
+    //
 
 //    println(dateTime.plusMonths(5).getMillis)
 //    Array.range(0, 280).foreach {
