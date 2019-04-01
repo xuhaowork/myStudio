@@ -165,4 +165,31 @@ class SparkAPISuite extends FunSuite {
     }
   }
 
+  /** spark SQL explode和flatMap */
+  test("spark SQL explode和flatMap") {
+    import cn.datashoe.sparkBase.TestSparkAPP
+    import TestSparkAPP.sqlc.implicits._
+    val df = TestSparkAPP.sc.parallelize(1 to 20, 2).map(Tuple1.apply).toDF("value")
+
+    import org.apache.spark.sql.functions._
+
+    import org.apache.spark.sql.functions.udf
+    import org.apache.spark.sql.functions.col
+
+    val uu = udf {
+      value: Double =>
+        Array(value / 5, value % 5)
+    }
+
+    df.select(col("value"), explode(uu(col("value")))/*.as(Array("a", "b"))*/).show()
+
+    df.select(col("value"), explode_outer(uu(col("value")))/*.as(Array("a", "b"))*/).show()
+
+    df.select(col("value"), posexplode(uu(col("value")))/*.as(Array("a", "b"))*/).show()
+
+    // 结论
+    // explode是类似于flatMap的操作
+
+  }
+
 }

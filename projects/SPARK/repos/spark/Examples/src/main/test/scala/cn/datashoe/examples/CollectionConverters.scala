@@ -2,7 +2,11 @@ package cn.datashoe.examples
 
 import org.scalatest.FunSuite
 
-class ScalaSupportWithJava extends FunSuite {
+
+/**
+  * java集合类和scala集合类的相互转换
+  */
+class CollectionConverters extends FunSuite {
   /**
     * java集合类和scala集合类的相互转换
     * ----
