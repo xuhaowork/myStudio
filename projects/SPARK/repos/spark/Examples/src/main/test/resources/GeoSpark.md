@@ -9,6 +9,7 @@ GeoSpark-Zeppelin equips two approaches to visualize spatial data in Zeppelin. T
 
 You can use Apache Zeppelin to plot a small number of spatial objects, such as 1000 points. Assume you already have a Spatial DataFrame, you need to convert the geometry column to WKT string column use the following command in your Zeppelin Spark notebook Scala paragraph:
 
+
 ```
 spark.sql(
   """
