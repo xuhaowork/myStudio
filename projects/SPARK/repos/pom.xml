@@ -48,7 +48,7 @@
         <module>Spark/SparkTimeSeries</module>
         <module>Spark/DataWrangling</module>
         <module>Spark/Examples</module>
-
+        <module>Spark/BigDL</module>
         <module>local/TimeSeries</module>
     </modules>
 

@@ -56,6 +56,7 @@ DateTime.ToString( “d “); // 返回后面跟有一个空白字符的月中�
 
 数值乘法的上溢和下溢以及示例
 用于时间解析，技巧：除以（较大的数 除以 较小的数）：前提是整数，此时不需要转为Double，无精度损失。利用的先验信息是：precision肯定比1000和1000000小，且经常整除
+```
 def parser(time: Long): Timestamp = {
   // 通常情况下precision都是10的整个数倍, 且小于1000, 因此可以调换乘积顺序防止上溢
   val timeByMillis = if (1000.0 / precision == 1000 / precision) {
@@ -84,13 +85,24 @@ def parser(time: Long): Timestamp = {
   }
 }
 
+```
+
+
 
 测试用例：
+```
 val time = new TimeWithLongParser()
   .setEPOCH(TimeWithLongParser.EPOCH_FORMAT.FILE_TIME_UTC)
   .setPrecision(100)
   .setTimeUnit(TimeWithLongParser.TIME_UNIT.NANOSECOND)
   .parser(129757574870723241L)
+```
+
+![道路图片](./road.jpg)
+
+![avatar](./ret.jpg)
+
+![avatar](./result.jpg)
 
 如果不是这样会造成：fileTimeUTC（一般都已经接近Long的上限了），乘以100就超了
 

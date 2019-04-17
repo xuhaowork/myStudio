@@ -11,17 +11,18 @@ class SparkAPISuite extends FunSuite {
     import org.apache.spark.{SparkConf, SparkContext}
     import org.joda.time.DateTime
 
-    val conf = new SparkConf().setAppName("Window Functions").setMaster("local")
+    import cn.datashoe.sparkBase.TestSparkAPP.sqlc
+/*    val conf = new SparkConf().setAppName("Window Functions").setMaster("local")
     val sc = new SparkContext(conf)
     val sparkSession = SparkSession.builder().config(conf).getOrCreate()
 
-    val sqlc = sparkSession.sqlContext
+    val sqlc = sparkSession.sqlContext*/
 
     import org.apache.spark.sql.functions._
 
     val l = (1997, 1) :: (1997, 4) :: (1998, 2) :: (1998, 3) :: (1999, 9) :: Nil
 
-    val df = sqlc.createDataFrame(l).toDF("k", "v").repartition(col(""))
+    val df = sqlc.createDataFrame(l).toDF("k", "v").repartition(col("v"))
 
     println("原数据")
     df.show()
