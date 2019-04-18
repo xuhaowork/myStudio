@@ -377,6 +377,17 @@ package object IOUtils {
 
     }
 
+
+    def tychyon(): Unit = {
+
+/*      import org.apache.spark.sql.Row
+      import org.apache.spark.sql.types._
+      val de = System.currentTimeMillis()
+      val inputRdd = sc.textFile("alluxio://192.168.11.35:19998/txt/bank.txt").map(s=>Row.fromSeq(s.split(",")))
+      println(inputRdd.count())*/
+
+    }
+
   }
 
 
@@ -403,5 +414,6 @@ package object IOUtils {
       else
         userDir + "/" + path.replaceAll("\\\\", "\\/")
     }
+
 
   }
