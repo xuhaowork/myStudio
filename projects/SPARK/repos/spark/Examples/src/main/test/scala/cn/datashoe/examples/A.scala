@@ -67,18 +67,6 @@ object A {
       * 数据预处理: 根据确定的周期对时间序列进行转换，确定时间序列的缺失率并进行插值补全
       * -- @note [[]]
       */
-    /**
-      * 时间序列处理的工具类
-      * ----
-      * 重分区: 将同一个设备的数据分到同一个分区并且进行过滤和排序
-      * -- @note: [[TimeSeriesProc.repartition]]
-      *
-      * 周期检测: 对排好序的时间序列提取若干个检测周期
-      * -- @note: [[TimeSeriesProc.periodDetect]]
-      *
-      * 数据预处理: 根据确定的周期对时间序列进行转换，确定时间序列的缺失率并进行插值补全
-      * -- @note [[]]
-      */
     object TimeSeriesProc extends Serializable {
       def transformDF(
                        input: DataFrame,
@@ -98,6 +86,7 @@ object A {
           case pattern(freqNum, unit) =>
             unit.toLowerCase() match {
               case "s" => freqNum.toInt * 1000L
+              case "m" => freqNum.toInt * 60 * 1000L
               case "min" => freqNum.toInt * 60 * 1000L
               case "h" => freqNum.toInt * 60 * 60 * 1000L
               case "d" => freqNum.toInt * 24 * 60 * 60 * 1000L
@@ -111,22 +100,25 @@ object A {
           timeIntervalFormat, interval)
         rdd.flatMapValues {
           case (startTime, endTime, values) =>
-            if (startTime >= endTime)
-              throw new Exception("起始时间小于截止时间")
-
             if (startTime >= endTime || values.isEmpty)
               Iterator.empty
             else {
-              val period = periodDetect(values, 20, 400, 0.2)
-              try {
-                transformSeries(values, startTime, endTime, period, missRate)
-              } catch {
-                case e: Exception => throw new Exception(s"出现异常${e.getMessage}\r\n" +
-                  s"${values.mkString("\r\n")}")
+              val period = periodDetect(values, 100, 400, 0.2)
+              // 根据现场确认: 周期不会低于1s, 且一般4h内的数据单个序列最高20000条, 因此限定不能超过10000000
+              // 以防止配置不高造成的栈溢出
+              // 周期没识别好的情况
+              if(period <= 1000L || (endTime - startTime) / period >= 10000000L || (endTime -startTime) / period <= 0)
+                Iterator.empty
+              else {
+                try {
+                  transformSeries(values, startTime, endTime, period, missRate)
+                } catch {
+                  case e: Exception => throw new Exception(s"插值过程出现异常${e.getMessage}")
+                }
               }
             }
-        }.values.filter(_ != null).map(values => (values.time, values.unitId, values.deviceId, values.gasConsistency,
-          values.unitName)).toDF("time", "unitId", "deviceId", "gasConsistency", "unitName")
+        }.values.map(values => (values.time, values.unitId, values.deviceId, values.gasConsistency,
+          values.period, values.unitName)).toDF("time", "unitId", "deviceId", "gasConsistency", "period", "unitName")
       }
 
 
@@ -208,8 +200,14 @@ object A {
       def periodDetect(series: Seq[GasValues],
                        num4level: Int,
                        num4circle: Int,
-                       rate4noise: Double): Long =
-        periodCounter(series, num4level, num4circle, rate4noise).toArray.maxBy(_._2)._1
+                       rate4noise: Double): Long = {
+        val periods = periodCounter(series, num4level, num4circle, rate4noise).toArray
+        if(periods.isEmpty)
+          -1L
+        else
+          periods.maxBy(_._2)._1
+      }
+
 
       def periodCounter(
                          series: Seq[GasValues],
@@ -217,6 +215,9 @@ object A {
                          num4circle: Int,
                          rate4noise: Double
                        ): mutable.Map[Long, Int] = {
+        // 沟通后确认周期不会超过1s, 为了防止一些噪声导致统计次数过大, 限定只有超过该长度时才会认为是周期
+        val minCircleValue = 1000L
+
         var sum = 0L
         var count = 0L
         var lastTime = 0L
@@ -226,12 +227,12 @@ object A {
 
         // 周期的计数器
         var circleCounter = scala.collection.mutable.Map.empty[Long, Int]
-        // 水平
+        // 水平 todo: 水平的确认是基于均值的, 可能受异常值干扰, 建议后面改为中值
         var level = 0L
         while (index < series.length && index < num4circle) {
           val newTime = series(index).time
           val newCircle = newTime - lastTime
-          if(newCircle > 0) {
+          if(newCircle > minCircleValue) {
             lastTime = newTime
             sum += (if (count > 0) newCircle else 0L)
             count += 1
@@ -341,77 +342,76 @@ object A {
         val cnt = ((endTime - startTime) / period).toInt
         // 构造一个存储器录入数据, 长度固定
         // 注意: 有录入动作时需要: 判定录入的index是否小于数组长度且大于等于0 & 更新最后录入记录的状态
-        val res = new Array[GasValues](cnt)
+        val res = mutable.ArrayBuilder.make[GasValues]()
 
         // 最后录入的记录器, 用于尾部缺失时的插值
-        var lastGroupId = -1L
+        var cursor = -1L
         var lastValue: GasValues = null
+        // 监视器, 监控目前录入的总条数, 双保险
+        var lth = 0
 
         var index = 0
         while (index < series.length) {
           val value = series(index)
           index += 1
-          // 该记录所归属的时间组id => 每条记录选择距离其最近的时间组 --注意利用了等间隔 + 中线
+          // 该记录所归属的时间组id => 每条记录选择距离其最近的时间组 -- 注意利用了等间隔 + 中线
           val groupId = ((value.time - startTime - period / 2) / period).toInt
           val groupTime = groupId * period + startTime + period / 2
+          val newValue = value.updateTime(groupTime).updatePeriod(period)
 
-          if(groupId >= 0 && groupId < cnt) {
+          if(groupId >= 0 && groupId < cnt && lth < cnt) {
             // 如果该次和上次记录归属于同一组录入[录入动作]
-            if (groupId == lastGroupId) {
-              res(groupId) = value.updateTime(groupTime).updatePeriod(period)
-            } else {
-              if (lastGroupId == -1L) {
-                // 开头缺失 => 用最近的非缺失值填充
-                var i = 0
-                // [录入动作]
-                while (i <= groupId) {
-                  val newValue = value.updateTime(startTime + period * i)
-                    .updateValue(value.gasConsistency)
-                    .updatePeriod(period)
-                  res(i) = newValue
-                  i += 1
-
-                  lastGroupId = i
-                  lastValue = newValue
+            require(groupId >= cursor, "算法异常: 新数据的id应该比cursor要高")
+            if(groupId > cursor) {
+              // 开头缺失 => 用最近的非缺失值填充
+              if(cursor == -1L) {
+                for(i <- 0 to groupId ) {
+                  res += newValue.updateTime(startTime + period * i)
+                  lth += 1
                 }
               } else {
                 // 中间缺失 => 用线性插值填充
-                val gap = (value.gasConsistency - lastValue.gasConsistency) / (groupId - lastGroupId).toDouble
+                require(lastValue != null, "算法异常: 非开头序列, cursor记录值不能为null")
+                val gap = (newValue.gasConsistency - lastValue.gasConsistency) / (groupId - cursor).toDouble
 
                 val lastTime = lastValue.time
-                val startId = lastGroupId.toInt
+                val startId = cursor.toInt
                 val lastGasValue = lastValue.gasConsistency
                 // [录入动作]
-                for (i <- (startId + 1) to groupId if i < cnt && i >= 0) {
+                for (i <- (startId + 1) to groupId) {
                   val newGasValue = lastGasValue + (i - startId) * gap // updateValue
-                  val newValue = value
+
+                  res += newValue
                     .updateTime(lastTime + (i - startId) * period)
                     .updateValue(newGasValue)
-                    .updatePeriod(period)
-                  res(i) = newValue
 
-                  lastGroupId = i
-                  lastValue = newValue
+                  lth += 1
                 }
               }
+
+              cursor = groupId
+              lastValue = newValue
+            }
+          }
+        }
+
+        if(cursor >= 0){
+          // 双保险
+          require(cursor == lth - 1 && lth <= cnt, "算法异常: 游标位置和计数不一致")
+
+          // 尾部的插值 --用最近的非缺失值填充
+          if (cursor < cnt - 1) {
+            // [录入动作] 此时不用更新最后的记录器
+            for (i <- (cursor.toInt + 1) until cnt) {
+              res += lastValue
+                .updateTime(lastValue.time + (i - cursor) * period)
+                .updatePeriod(period)
+              lth += 1
             }
           }
 
-        }
-
-        // 尾部的插值 --用最近的非缺失值填充
-        if (lastGroupId != cnt - 1 && lastGroupId >= 0) {
-          // [录入动作] 此时不用更新最后的记录器
-          for (i <- (lastGroupId.toInt + 1) until cnt) {
-            res(i) = lastValue
-              .updateTime(lastValue.time + (i - lastGroupId) * period)
-              .updatePeriod(period)
-          }
-        }
-
-        if (lastGroupId >= 0)
-          res
-        else
+          res.result()
+        } else
           Array.empty[GasValues]
       }
 
@@ -427,14 +427,14 @@ object A {
     val unitIdCol: String = "unitid"
     val gasConsistencyCol: String = "value"
     val timeFormat: String = "yyyy-MM-dd HH:mm:ss"
-    val timeIntervalFormat: String = "back" // "back"
+    val timeIntervalFormat: String = "minMax" // "back"
     val intervalString: String = "4h"
     val missRate: Double = 0.5
 
     val tableName = "ysk.t_fact_yx_sbyxjl_lsb_zl"
     val data = spark.sql(s"select $deviceIdCol, $timeCol, $unitNameCol, $unitIdCol, $gasConsistencyCol from $tableName").na.drop("any")
 
-    spark.sql(s"select $deviceIdCol, count(1) as cnt from $tableName group by $deviceIdCol").show()
+//    spark.sql(s"select $deviceIdCol, count(1) as cnt from $tableName group by $deviceIdCol order by cnt desc").show()
     data.cache()
     val res = transformDF(
           data,
