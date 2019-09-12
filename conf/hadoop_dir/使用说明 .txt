@@ -1,1 +1,0 @@
-winutils.exe是在window系统上安装hadoop时所需要的winutils文件，内附多个版本，支持hadoop-2.6.0等多个版本，赶快下载安装吧！
