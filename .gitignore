@@ -5,10 +5,13 @@
 *.iml
 */*.iml
 *.idea
+.idea
+
 
 # out dir
 /myproject/out/
 
-
-
-/projects/Programing/cpp
+# virtual studio
+.vs
+Debug
+x64
